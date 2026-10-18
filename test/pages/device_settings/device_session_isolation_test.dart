@@ -177,4 +177,47 @@ void main() {
     await Future.wait([bobLoad, duplicateBobLoad]);
     expect(_deviceIds(container), ['BOB']);
   });
+
+  test('old UIA success or failure cannot mutate a new account revocation',
+      () async {
+    final alice = _AccountClient('@alice:example.org', 'ALICE');
+    final bob = _AccountClient('@bob:example.org', 'BOB');
+    // Both users have a session with the same server-issued device ID.
+    final interactor = _QueuedDevices([
+      _devices('SHARED'),
+      _devices('SHARED'),
+    ]);
+    final container = _createContainer(interactor);
+    final notifier = container.read(devicesSettingsViewModelProvider.notifier);
+
+    await notifier.loadUserDevices(alice);
+    final aliceGeneration = notifier.tryBeginDeletingDevicesForClient(alice);
+    expect(aliceGeneration, isNotNull);
+
+    await notifier.loadUserDevices(bob);
+    final bobGeneration = notifier.tryBeginDeletingDevicesForClient(bob);
+    expect(bobGeneration, isNotNull);
+    expect(notifier.tryBeginDeletingDevicesForClient(alice), isNull);
+
+    notifier.finishDeletingDevicesForClient(
+      client: alice,
+      generation: aliceGeneration!,
+      removedIds: ['SHARED'],
+    );
+    notifier.finishDeletingDevicesForClient(
+      client: alice,
+      generation: aliceGeneration,
+      error: 'M_FORBIDDEN',
+    );
+    expect(container.read(devicesSettingsViewModelProvider),
+        isA<DevicesSettingsDeletingDevices>());
+    expect(notifier.notThisDevice(bob).single.deviceId, 'SHARED');
+
+    notifier.finishDeletingDevicesForClient(
+      client: bob,
+      generation: bobGeneration!,
+      removedIds: ['SHARED'],
+    );
+    expect(_deviceIds(container), isEmpty);
+  });
 }

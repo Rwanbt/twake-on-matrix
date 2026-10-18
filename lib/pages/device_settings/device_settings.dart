@@ -264,19 +264,27 @@ Future<void> removeDevicesAction(
       .where(availableRemoteIds.contains)
       .toSet()
       .toList();
-  if (deviceIds.isEmpty || !notifier.tryBeginDeletingDevices()) return;
+  if (deviceIds.isEmpty) return;
+  final generation = notifier.tryBeginDeletingDevicesForClient(client);
+  if (generation == null) return;
 
   try {
     notifier.setErrorDeletingDevices(null);
     await client.uiaRequestBackground(
       (auth) => client.deleteDevices(deviceIds, auth: auth),
     );
-    notifier.removeDevicesFromState(deviceIds);
+    notifier.finishDeletingDevicesForClient(
+      client: client,
+      generation: generation,
+      removedIds: deviceIds,
+    );
   } catch (e, s) {
     Logs().v('Error while deleting devices', e, s);
-    notifier.setErrorDeletingDevices(e.toString());
-  } finally {
-    notifier.setLoadingDeletingDevices(false);
+    notifier.finishDeletingDevicesForClient(
+      client: client,
+      generation: generation,
+      error: e.toString(),
+    );
   }
 }
 
@@ -303,6 +311,8 @@ Future<void> verifyDeviceAction(
   Device device,
 ) async {
   final client = Matrix.of(context).client;
+  final generation = notifier.deviceSessionGeneration(client);
+  if (generation == null) return;
   // Keep a handle so a dismissed loading dialog cannot orphan the request.
   final verificationFuture = client
       .userDeviceKeys[client.userID!]!
@@ -324,12 +334,17 @@ Future<void> verifyDeviceAction(
     );
     return;
   }
+  if (!context.mounted ||
+      notifier.deviceSessionGeneration(client) != generation) {
+    unawaited(req.cancel(KeyVerificationCodeEnum.user.code));
+    return;
+  }
   // Refresh only on a terminal state; a plain dialog close (cancel) is not one.
   req.onUpdate = () {
-    if ({
-      KeyVerificationState.error,
-      KeyVerificationState.done,
-    }.contains(req.state)) {
+    if (notifier.deviceSessionGeneration(client) != generation) return;
+    if ({KeyVerificationState.error, KeyVerificationState.done}.contains(
+      req.state,
+    )) {
       notifier.refreshDeviceKeys();
     }
   };

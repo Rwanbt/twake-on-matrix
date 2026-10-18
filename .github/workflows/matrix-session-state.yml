@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/matrix-session-state.yml'
+      - 'lib/pages/device_settings/device_settings.dart'
       - 'lib/pages/device_settings/device_settings_view_model.dart'
       - 'test/pages/device_settings/device_session_isolation_test.dart'
   workflow_dispatch:

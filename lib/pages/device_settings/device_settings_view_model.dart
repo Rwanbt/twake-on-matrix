@@ -46,6 +46,11 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
   bool _isCurrentClient(Client client, int generation) =>
       _belongsToCurrentClient(client) && _clientGeneration == generation;
 
+  /// Lease for asynchronous device actions. The lease expires on logout,
+  /// account switch, or reinitialization of the same Matrix Client instance.
+  int? deviceSessionGeneration(Client client) =>
+      _belongsToCurrentClient(client) ? _clientGeneration : null;
+
   Future<void> _trackLoad(Future<void> operation) {
     late final Future<void> pending;
     pending = operation.whenComplete(() {
@@ -264,6 +269,30 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
     }
     setLoadingDeletingDevices(true);
     return true;
+  }
+
+  int? tryBeginDeletingDevicesForClient(Client client) {
+    if (!_belongsToCurrentClient(client) || !tryBeginDeletingDevices()) {
+      return null;
+    }
+    return _clientGeneration;
+  }
+
+  /// A late UIA response from a previous Matrix account must never delete a
+  /// matching device ID or clear the busy state of the newly signed-in user.
+  void finishDeletingDevicesForClient({
+    required Client client,
+    required int generation,
+    List<String> removedIds = const [],
+    String? error,
+  }) {
+    if (!_isCurrentClient(client, generation)) return;
+    if (error != null) {
+      setErrorDeletingDevices(error);
+    } else {
+      removeDevicesFromState(removedIds);
+    }
+    setLoadingDeletingDevices(false);
   }
 
   void setErrorDeletingDevices(String? error) {
