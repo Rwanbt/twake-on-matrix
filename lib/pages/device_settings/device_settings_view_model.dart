@@ -126,7 +126,13 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
             },
             (success) {
               if (success is GetDevicesSuccess) {
-                state = DevicesSettingsState.loaded(devices: success.devices);
+                if (preserveStateOnFailure && _devices != null) {
+                  // A background refresh must not reset a dismissed trust
+                  // warning or the device-key revision after verification.
+                  _transition(devices: success.devices);
+                } else {
+                  state = DevicesSettingsState.loaded(devices: success.devices);
+                }
               }
             },
           );
@@ -134,6 +140,9 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
   }
 
   Future<void> reload(Client client) {
+    // Reuse an active request without erasing its still-visible device list.
+    final pending = _loadInFlight;
+    if (pending != null) return pending;
     state = const DevicesSettingsState.initial();
     return _loadInFlight ??= _loadUserDevices(client).whenComplete(() {
       _loadInFlight = null;
@@ -177,11 +186,24 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
     );
   }
 
-  void setLoadingDeletingDevices(bool loading) =>
-      _transition(deleting: loading);
+  void setLoadingDeletingDevices(bool loading) {
+    if (loading) {
+      _transition(deleting: true);
+    } else if (state is DevicesSettingsDeletingDevices) {
+      _transition();
+    }
+    // A failed deletion has already moved to the error state. Do not clear
+    // that error in the finally block of the deletion action.
+  }
 
-  void setErrorDeletingDevices(String? error) =>
+  void setErrorDeletingDevices(String? error) {
+    if (error != null) {
       _transition(deleteError: error);
+    } else if (state is DevicesSettingsDeleteDevicesError) {
+      _transition();
+    }
+    // Clearing an old error must not interrupt an active deletion.
+  }
 
   void removeDevicesFromState(List<String> deviceIds) {
     final devices = _devices;

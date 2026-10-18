@@ -6,6 +6,7 @@ import 'package:twake_chat/pages/key_verification/key_verification_success_view.
 import 'package:twake_chat/pages/key_verification/key_verification_waiting_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix/encryption.dart';
 
@@ -74,6 +75,30 @@ void _emojiViewTests() {
     await tester.tap(find.text('Match'));
     expect(dontMatchTapped, isTrue);
     expect(matchTapped, isTrue);
+  });
+
+  testWidgets('keyboard Enter can reject mismatched E2EE SAS', (tester) async {
+    var rejected = 0;
+    var confirmed = 0;
+    await tester.pumpWidget(
+      _wrap(
+        KeyVerificationEmojiView(
+          emojis: [KeyVerificationEmoji(0)],
+          onDontMatch: () => rejected++,
+          onMatch: () => confirmed++,
+        ),
+      ),
+    );
+
+    // A hardware keyboard must be able to reject a mismatched SAS without
+    // accidentally marking the device as trusted.
+    Focus.of(tester.element(find.text("Don't match"))).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+
+    expect(rejected, 1);
+    expect(confirmed, 0);
   });
 }
 
