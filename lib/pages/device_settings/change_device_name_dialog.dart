@@ -62,7 +62,9 @@ class _ChangeDeviceNameViewState extends State<ChangeDeviceNameView> {
     if (_isSaving) return;
     final name = _controller.text.trim();
     if (name.isEmpty) {
-      Navigator.of(context).pop();
+      // Invalid input must not close the modal: keep the edit text and
+      // describe the problem via the TextField's accessible error state.
+      setState(() => _errorText = L10n.of(context)!.enterNewDisplayName);
       return;
     }
     setState(() {

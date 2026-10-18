@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:linagora_design_flutter/linagora_design_flutter.dart';
 import 'package:linagora_design_flutter/style/linagora_text_theme.dart';
 
 import 'package:twake_chat/config/localizations/localization_service.dart';
@@ -72,6 +73,36 @@ Future<void> _savingEmptyNameIsNoOp(WidgetTester tester) async {
   );
 
   expect(saveCalled, isFalse);
+  expect(find.byType(ChangeDeviceNameView), findsOneWidget);
+  expect(
+    tester.widget<LinagoraTextField>(find.byType(LinagoraTextField)).errorText,
+    isNotEmpty,
+  );
+}
+
+Future<void> _submittingWithKeyboardSavesExactlyOnce(WidgetTester tester) async {
+  var calls = 0;
+  String? submitted;
+  await _pumpView(tester, onSave: (name) async {
+    calls++;
+    submitted = name;
+  });
+  await tester.enterText(find.byType(TextField), '  Trusted laptop  ');
+  await tester.testTextInput.receiveAction(TextInputAction.done);
+  await tester.pump();
+  expect(submitted, 'Trusted laptop');
+  expect(calls, 1);
+}
+
+Future<void> _invalidKeyboardSubmitRetainsInput(WidgetTester tester) async {
+  var calls = 0;
+  await _pumpView(tester, onSave: (_) async => calls++);
+  await tester.enterText(find.byType(TextField), '   ');
+  await tester.testTextInput.receiveAction(TextInputAction.done);
+  await tester.pump();
+  expect(calls, 0);
+  expect(find.byType(ChangeDeviceNameView), findsOneWidget);
+  expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, '   ');
 }
 
 Future<void> _onSaveErrorKeepsModalOpenWithError(WidgetTester tester) async {
@@ -114,6 +145,14 @@ void main() {
   testWidgets(
     'saving an empty name is a no-op (does not call onSave)',
     _savingEmptyNameIsNoOp,
+  );
+  testWidgets(
+    'the keyboard Done action saves one trimmed device name',
+    _submittingWithKeyboardSavesExactlyOnce,
+  );
+  testWidgets(
+    'invalid keyboard submission preserves the dialog and entered content',
+    _invalidKeyboardSubmitRetainsInput,
   );
 
   testWidgets(
