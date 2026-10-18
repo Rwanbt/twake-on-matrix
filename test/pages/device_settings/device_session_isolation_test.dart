@@ -20,10 +20,13 @@ class _AccountClient extends Mock implements Client {
   _AccountClient(this.userID, this.deviceID);
 
   @override
-  final String? userID;
+  String? userID;
 
   @override
-  final String? deviceID;
+  String? deviceID;
+
+  @override
+  Uri? get homeserver => Uri.parse('https://example.org');
 }
 
 class _QueuedDevices extends GetDevicesInteractor {
@@ -41,12 +44,12 @@ class _QueuedDevices extends GetDevicesInteractor {
 }
 
 Stream<Either<Failure, Success>> _devices(String name) => Stream.value(
-  Right(GetDevicesSuccess(devices: [Device(deviceId: name)])),
-);
+      Right(GetDevicesSuccess(devices: [Device(deviceId: name)])),
+    );
 
 Stream<Either<Failure, Success>> _offline() => Stream.value(
-  Left(GetDevicesFailed(exception: Exception('temporarily offline'))),
-);
+      Left(GetDevicesFailed(exception: Exception('temporarily offline'))),
+    );
 
 ProviderContainer _createContainer(_QueuedDevices interactor) {
   final container = ProviderContainer(
@@ -66,7 +69,8 @@ List<String> _deviceIds(ProviderContainer container) {
 }
 
 void main() {
-  test('offline refresh preserves devices and later reconnect replaces them', () async {
+  test('offline refresh preserves devices and later reconnect replaces them',
+      () async {
     final client = _AccountClient('@alice:example.org', 'ALICE');
     final interactor = _QueuedDevices([
       _devices('OLD'),
@@ -84,7 +88,8 @@ void main() {
     expect(interactor.calls, 3);
   });
 
-  test('switching Matrix clients does not reuse a previous account device list', () async {
+  test('switching Matrix clients does not reuse a previous account device list',
+      () async {
     final alice = _AccountClient('@alice:example.org', 'ALICE');
     final bob = _AccountClient('@bob:example.org', 'BOB');
     final interactor = _QueuedDevices([_devices('ALICE'), _devices('BOB')]);
@@ -99,7 +104,31 @@ void main() {
     expect(interactor.calls, 2);
   });
 
-  test('late old-account sync cannot reveal or overwrite new-account devices', () async {
+  test('reusing a Matrix Client after login as another user invalidates devices',
+      () async {
+    final client = _AccountClient('@alice:example.org', 'ALICE');
+    final interactor = _QueuedDevices([_devices('ALICE'), _devices('BOB')]);
+    final container = _createContainer(interactor);
+    final notifier = container.read(devicesSettingsViewModelProvider.notifier);
+
+    await notifier.loadUserDevices(client);
+    expect(_deviceIds(container), ['ALICE']);
+
+    // Some login flows reinitialize the same Client instance. Old device and
+    // trust state must not remain visible after the identity has changed.
+    client.userID = '@bob:example.org';
+    client.deviceID = 'BOB';
+    expect(notifier.thisDevice(client), isNull);
+    expect(notifier.notThisDevice(client), isEmpty);
+    expect(notifier.showVerificationBanner(client), isFalse);
+
+    await notifier.loadUserDevices(client);
+    expect(_deviceIds(container), ['BOB']);
+    expect(interactor.calls, 2);
+  });
+
+  test('late old-account sync cannot reveal or overwrite new-account devices',
+      () async {
     final alice = _AccountClient('@alice:example.org', 'ALICE');
     final bob = _AccountClient('@bob:example.org', 'BOB');
     final aliceResponse = Completer<Either<Failure, Success>>();
@@ -120,7 +149,8 @@ void main() {
     expect(_deviceIds(container), ['BOB']);
   });
 
-  test('old account completion cannot unlock an active new-account request', () async {
+  test('old account completion cannot unlock an active new-account request',
+      () async {
     final alice = _AccountClient('@alice:example.org', 'ALICE');
     final bob = _AccountClient('@bob:example.org', 'BOB');
     final oldResponse = Completer<Either<Failure, Success>>();

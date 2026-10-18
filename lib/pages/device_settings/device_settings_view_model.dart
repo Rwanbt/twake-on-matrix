@@ -11,10 +11,49 @@ part 'device_settings_view_model.g.dart';
 class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
   Future<void>? _loadInFlight;
   int _localDeviceRevision = 0;
+  Client? _activeClient;
+  String? _activeUserId;
+  String? _activeDeviceId;
+  Uri? _activeHomeserver;
+  int _clientGeneration = 0;
 
   @override
   DevicesSettingsState build() {
     return const DevicesSettingsState.initial();
+  }
+
+  // This provider may outlive a Matrix login session. Never display cached
+  // sessions from another account or apply responses that complete after it
+  // has been replaced.
+  void _activateClient(Client client) {
+    if (_belongsToCurrentClient(client)) return;
+    _activeClient = client;
+    _activeUserId = client.userID;
+    _activeDeviceId = client.deviceID;
+    _activeHomeserver = client.homeserver;
+    _clientGeneration++;
+    _localDeviceRevision = 0;
+    _loadInFlight = null;
+    state = const DevicesSettingsState.initial();
+  }
+
+  bool _belongsToCurrentClient(Client client) =>
+      identical(_activeClient, client) &&
+      _activeUserId == client.userID &&
+      _activeDeviceId == client.deviceID &&
+      _activeHomeserver == client.homeserver;
+
+  bool _isCurrentClient(Client client, int generation) =>
+      _belongsToCurrentClient(client) && _clientGeneration == generation;
+
+  Future<void> _trackLoad(Future<void> operation) {
+    late final Future<void> pending;
+    pending = operation.whenComplete(() {
+      // An obsolete request must not unlock a newer account's pending fetch.
+      if (identical(_loadInFlight, pending)) _loadInFlight = null;
+    });
+    _loadInFlight = pending;
+    return pending;
   }
 
   bool _isOwnDevice(Device userDevice, Client client) =>
@@ -75,14 +114,17 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
     }
   }
 
-  Device? thisDevice(Client client) =>
-      _devices?.firstWhereOrNull((d) => _isOwnDevice(d, client));
+  Device? thisDevice(Client client) => _belongsToCurrentClient(client)
+      ? _devices?.firstWhereOrNull((d) => _isOwnDevice(d, client))
+      : null;
 
-  List<Device> notThisDevice(Client client) => List<Device>.from(_devices ?? [])
+  List<Device> notThisDevice(Client client) =>
+      List<Device>.from(_belongsToCurrentClient(client) ? _devices ?? [] : [])
     ..removeWhere((d) => _isOwnDevice(d, client))
     ..sort((a, b) => (b.lastSeenTs ?? 0).compareTo(a.lastSeenTs ?? 0));
 
   bool showVerificationBanner(Client client) {
+    if (!_belongsToCurrentClient(client)) return false;
     final devices = _devices;
     if (devices == null) return false;
     if (_bannerVisibility == VerificationBannerVisibility.dismissed) {
@@ -100,10 +142,9 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
   }
 
   Future<void> loadUserDevices(Client client) {
+    _activateClient(client);
     if (_devices != null) return Future.value();
-    return _loadInFlight ??= _loadUserDevices(client).whenComplete(() {
-      _loadInFlight = null;
-    });
+    return _loadInFlight ?? _trackLoad(_loadUserDevices(client));
   }
 
   Future<void> _loadUserDevices(
@@ -113,10 +154,12 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
     // A refresh started before a successful revoke or rename must not restore
     // an obsolete device list when its response finally arrives.
     final startedAtRevision = _localDeviceRevision;
+    final startedForGeneration = _clientGeneration;
     await ref
         .read(getDevicesInteractorProvider)
         .execute(client: client)
         .forEach((either) {
+          if (!_isCurrentClient(client, startedForGeneration)) return;
           if (startedAtRevision != _localDeviceRevision) return;
           either.fold(
             (failure) {
@@ -151,23 +194,20 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
   }
 
   Future<void> reload(Client client) {
+    _activateClient(client);
     // Reuse an active request without erasing its still-visible device list.
     final pending = _loadInFlight;
     if (pending != null) return pending;
-    // Manual refresh must not expose a second deletion action while a
-    // Matrix UIA revoke request is still pending.
-    if (state is DevicesSettingsDeletingDevices) return _softReload(client);
+    // A lost connection during manual refresh must not erase the last known
+    // sessions, trust indicators, or an active device-revocation lock.
+    if (_devices != null) return _softReload(client);
     state = const DevicesSettingsState.initial();
-    return _loadInFlight ??= _loadUserDevices(client).whenComplete(() {
-      _loadInFlight = null;
-    });
+    return _trackLoad(_loadUserDevices(client));
   }
 
   Future<void> _softReload(Client client) {
-    return _loadInFlight ??=
-        _loadUserDevices(client, preserveStateOnFailure: true).whenComplete(() {
-          _loadInFlight = null;
-        });
+    return _loadInFlight ??
+        _trackLoad(_loadUserDevices(client, preserveStateOnFailure: true));
   }
 
   Future<void> renameDevice({
@@ -175,7 +215,12 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
     required String deviceId,
     required String displayName,
   }) async {
+    // A dialog retained across logout may still call this method. It cannot
+    // mutate or refresh the newly selected account's device cache.
+    if (!_belongsToCurrentClient(client)) return;
+    final startedForGeneration = _clientGeneration;
     await client.updateDevice(deviceId, displayName: displayName);
+    if (!_isCurrentClient(client, startedForGeneration)) return;
     // Keep the new name if soft-reload fails with preserveStateOnFailure.
     _applyLocalDisplayName(deviceId, displayName);
     await _softReload(client);
