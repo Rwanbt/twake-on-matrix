@@ -186,13 +186,15 @@ def run():
     for method, endpoint, payload in (
         ("GET", "/_matrix/client/v3/sync?timeout=0", None),
         ("POST", "/_matrix/client/v3/keys/upload", {"one_time_keys": {}}),
+        ("POST", "/_matrix/client/v3/keys/query", {"device_keys": {alice["user_id"]: []}}),
+        ("POST", "/_matrix/client/v3/keys/claim", {"one_time_keys": {}}),
     ):
         status, result = request(
             method, endpoint, token=alice_second["access_token"], payload=payload
         )
         require(
             status == 401 and result.get("errcode") == "M_UNKNOWN_TOKEN",
-            "Revoked Matrix session retains sync or encryption key upload access",
+            "Revoked Matrix session retains sync or encryption key API access",
         )
     status, result = request(
         "GET", "/_matrix/client/v3/sync?timeout=0", token=alice["access_token"]
@@ -200,7 +202,7 @@ def run():
     require(status == 200 and bool(result.get("next_batch")),
             "Surviving Matrix session cannot sync after revocation")
     print("PASS: disposable Synapse UIA, foreign account isolation, "
-          "second-device revocation, revoked sync/key upload and surviving sync")
+          "second-device revocation, revoked sync/key upload/query/claim and surviving sync")
 
 
 if __name__ == "__main__":
