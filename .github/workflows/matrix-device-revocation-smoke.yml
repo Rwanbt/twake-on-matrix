@@ -1,0 +1,29 @@
+name: Disposable Synapse Matrix device revocation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/matrix-device-revocation-smoke.yml'
+      - 'scripts/ci/matrix-device-revocation-smoke.py'
+      - 'scripts/integration-server-synapse.sh'
+      - 'integration_test/synapse/data/homeserver.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  matrix-device-revocation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Start disposable local Matrix homeserver
+        run: ./scripts/integration-server-synapse.sh
+      - name: Test real Matrix UIA device revocation and token isolation
+        run: python3 scripts/ci/matrix-device-revocation-smoke.py
+      - name: Destroy disposable Matrix homeserver
+        if: always()
+        run: docker rm -f synapse || true
