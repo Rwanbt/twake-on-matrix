@@ -30,7 +30,9 @@ test('Chat analyzer and widget test gates always run on pull requests', () => {
 
 test('preview builds must reject fork heads before accessing deployment write credentials', () => {
   const preview = read('gh-pages.yaml')
-  assert.match(preview, /^\s+if: \$\{\{ github\.event\.pull_request\.head\.repo\.full_name == github\.repository \}\}/m)
+  assert.match(preview, /^\s+if: \$\{\{ github\.event\.repository\.fork == false && github\.event\.pull_request\.head\.repo\.full_name == github\.repository \}\}/m)
   assert.match(preview, /pull_request:/)
   assert.match(preview, /github_token: \$\{\{ secrets\.GITHUB_TOKEN \}\}/)
+  const cleanup = read('clean-up-gh-pages.yaml')
+  assert.match(cleanup, /^\s+if: \$\{\{ github\.event\.repository\.fork == false \}\}/m)
 })

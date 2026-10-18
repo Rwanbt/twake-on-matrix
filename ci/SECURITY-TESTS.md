@@ -10,9 +10,12 @@ checkout. The earlier `tests.yaml` granted write scopes and read
 This patch gives the PR tests read-only access and no SSH secrets,
 sets `persist-credentials: false`, and pins the test checkout,
 Flutter, Rust and cache actions to reviewed SHAs. The preview workflow
-now **skips fork PRs** before accessing build-time configuration or a
-GitHub Pages write token. External contributors retain analysis/tests
-without privileged deployment; same-repository PR previews remain.
+now **skips fork PRs and fork repositories** before accessing build-time
+configuration or a GitHub Pages write token. The cleanup job is also
+restricted to the non-fork upstream. External contributors and standalone
+forks retain unprivileged analyzer/widget/browser integration tests.
+Privileged preview builds must be qualified separately against an
+appropriately provisioned upstream environment.
 
 ## Deterministic local test
 
