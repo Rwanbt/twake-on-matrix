@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linagora_design_flutter/linagora_design_flutter.dart';
-import 'package:linagora_design_flutter/style/linagora_text_theme.dart';
 
 import 'package:twake_chat/config/localizations/localization_service.dart';
 import 'package:twake_chat/generated/l10n/app_localizations.dart';
