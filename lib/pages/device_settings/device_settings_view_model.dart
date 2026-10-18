@@ -10,6 +10,7 @@ part 'device_settings_view_model.g.dart';
 @riverpod
 class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
   Future<void>? _loadInFlight;
+  int _localDeviceRevision = 0;
 
   @override
   DevicesSettingsState build() {
@@ -109,10 +110,14 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
     Client client, {
     bool preserveStateOnFailure = false,
   }) async {
+    // A refresh started before a successful revoke or rename must not restore
+    // an obsolete device list when its response finally arrives.
+    final startedAtRevision = _localDeviceRevision;
     await ref
         .read(getDevicesInteractorProvider)
         .execute(client: client)
         .forEach((either) {
+          if (startedAtRevision != _localDeviceRevision) return;
           either.fold(
             (failure) {
               if (failure is GetDevicesEmpty) {
@@ -143,6 +148,9 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
     // Reuse an active request without erasing its still-visible device list.
     final pending = _loadInFlight;
     if (pending != null) return pending;
+    // Manual refresh must not expose a second deletion action while a
+    // Matrix UIA revoke request is still pending.
+    if (state is DevicesSettingsDeletingDevices) return _softReload(client);
     state = const DevicesSettingsState.initial();
     return _loadInFlight ??= _loadUserDevices(client).whenComplete(() {
       _loadInFlight = null;
@@ -170,6 +178,7 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
   void _applyLocalDisplayName(String deviceId, String displayName) {
     final devices = _devices;
     if (devices == null) return;
+    _localDeviceRevision++;
     _transition(
       devices: [
         for (final device in devices)
@@ -196,6 +205,16 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
     // that error in the finally block of the deletion action.
   }
 
+  /// Atomically claims the revocation UI operation after confirmation.
+  /// Two open confirmation dialogs must not submit overlapping UIA requests.
+  bool tryBeginDeletingDevices() {
+    if (_devices == null || state is DevicesSettingsDeletingDevices) {
+      return false;
+    }
+    setLoadingDeletingDevices(true);
+    return true;
+  }
+
   void setErrorDeletingDevices(String? error) {
     if (error != null) {
       _transition(deleteError: error);
@@ -209,6 +228,8 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
     final devices = _devices;
     if (devices == null) return;
     final idsToRemove = deviceIds.toSet();
+    if (!devices.any((device) => idsToRemove.contains(device.deviceId))) return;
+    _localDeviceRevision++;
     _transition(
       devices: devices.where((d) => !idsToRemove.contains(d.deviceId)).toList(),
     );

@@ -100,6 +100,56 @@ void _emojiViewTests() {
     expect(rejected, 1);
     expect(confirmed, 0);
   });
+
+  testWidgets('keyboard Space can confirm only an explicitly matched SAS', (
+    tester,
+  ) async {
+    var rejected = 0;
+    var confirmed = 0;
+    await tester.pumpWidget(
+      _wrap(
+        KeyVerificationEmojiView(
+          emojis: [KeyVerificationEmoji(0), KeyVerificationEmoji(1)],
+          onDontMatch: () => rejected++,
+          onMatch: () => confirmed++,
+        ),
+      ),
+    );
+
+    Focus.of(tester.element(find.text('Match'))).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+
+    expect(confirmed, 1);
+    expect(rejected, 0);
+  });
+
+  testWidgets('six SAS emoji stay usable at 320px without overflow', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _wrap(
+        KeyVerificationEmojiView(
+          emojis: [
+            for (var i = 0; i < 6; i++) KeyVerificationEmoji(i),
+          ],
+          onDontMatch: () {},
+          onMatch: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text("Don't match"), findsOneWidget);
+    expect(find.text('Match'), findsOneWidget);
+  });
 }
 
 void _successViewTests() {

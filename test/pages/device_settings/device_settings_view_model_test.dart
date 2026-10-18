@@ -274,6 +274,100 @@ Future<void> _reloadDuringSoftSyncKeepsDeviceListVisible() async {
   );
 }
 
+Future<void> _staleSyncCannotRestoreRevokedDevice() async {
+  final client = await getClient();
+  final devices = [
+    Device(deviceId: 'QBUAZIFURK', displayName: 'Laptop'),
+    Device(deviceId: 'OTHER', displayName: 'Revoked phone'),
+  ];
+  final refreshStarted = Completer<void>();
+  final refresh = StreamController<Either<Failure, Success>>(
+    onListen: refreshStarted.complete,
+  );
+  addTearDown(refresh.close);
+  final container = _container(
+    FakeGetDevicesInteractor([_success(devices), refresh.stream]),
+  );
+  addTearDown(container.dispose);
+  final notifier = container.read(devicesSettingsViewModelProvider.notifier);
+  await notifier.loadUserDevices(client);
+
+  final rename = notifier.renameDevice(
+    client: client,
+    deviceId: 'QBUAZIFURK',
+    displayName: 'Renamed laptop',
+  );
+  await refreshStarted.future.timeout(const Duration(seconds: 10));
+
+  expect(notifier.tryBeginDeletingDevices(), isTrue);
+  expect(
+    notifier.tryBeginDeletingDevices(),
+    isFalse,
+    reason: 'two confirmed revocations cannot start overlapping UIA calls',
+  );
+  notifier.removeDevicesFromState(['OTHER']);
+  notifier.refreshDeviceKeys();
+  refresh.add(Right(GetDevicesSuccess(devices: devices)));
+  await refresh.close().timeout(const Duration(seconds: 10));
+  await rename.timeout(const Duration(seconds: 10));
+
+  final busy = container.read(devicesSettingsViewModelProvider);
+  expect(busy, isA<DevicesSettingsDeletingDevices>());
+  final deleting = busy as DevicesSettingsDeletingDevices;
+  expect(deleting.keysRevision, 1);
+  expect(deleting.devices.map((d) => d.deviceId), ['QBUAZIFURK']);
+
+  notifier.setLoadingDeletingDevices(false);
+  final settled = container.read(devicesSettingsViewModelProvider);
+  expect(settled, isA<DevicesSettingsLoaded>());
+  expect(
+    (settled as DevicesSettingsLoaded).devices.single.displayName,
+    'Renamed laptop',
+  );
+}
+
+Future<void> _manualReloadCannotInterruptRevocation() async {
+  final client = await getClient();
+  final devices = [Device(deviceId: 'GHTYAJCE')];
+  final refreshStarted = Completer<void>();
+  final refresh = StreamController<Either<Failure, Success>>(
+    onListen: refreshStarted.complete,
+  );
+  addTearDown(refresh.close);
+  final interactor = FakeGetDevicesInteractor([
+    _success(devices),
+    refresh.stream,
+  ]);
+  final container = _container(interactor);
+  addTearDown(container.dispose);
+  final notifier = container.read(devicesSettingsViewModelProvider.notifier);
+  await notifier.loadUserDevices(client);
+
+  expect(notifier.tryBeginDeletingDevices(), isTrue);
+  final first = notifier.reload(client);
+  await refreshStarted.future.timeout(const Duration(seconds: 10));
+  final second = notifier.reload(client);
+  expect(interactor.callCount, 2);
+  expect(
+    container.read(devicesSettingsViewModelProvider),
+    isA<DevicesSettingsDeletingDevices>(),
+  );
+
+  refresh.add(Right(GetDevicesSuccess(devices: devices)));
+  await refresh.close().timeout(const Duration(seconds: 10));
+  await Future.wait([first, second]).timeout(const Duration(seconds: 10));
+  expect(
+    container.read(devicesSettingsViewModelProvider),
+    isA<DevicesSettingsDeletingDevices>(),
+    reason: 'a completed Matrix sync must not re-enable device revocation',
+  );
+  notifier.setLoadingDeletingDevices(false);
+  expect(
+    container.read(devicesSettingsViewModelProvider),
+    isA<DevicesSettingsLoaded>(),
+  );
+}
+
 void main() {
   test(
     'soft reload failure after renameDevice preserves the loaded devices '
@@ -304,5 +398,13 @@ void main() {
   test(
     'manual reload during background device sync keeps sessions visible',
     _reloadDuringSoftSyncKeepsDeviceListVisible,
+  );
+  test(
+    'a stale Matrix sync cannot resurrect a revoked device or clear busy',
+    _staleSyncCannotRestoreRevokedDevice,
+  );
+  test(
+    'manual device sync remains coalesced and busy during active revocation',
+    _manualReloadCannotInterruptRevocation,
   );
 }

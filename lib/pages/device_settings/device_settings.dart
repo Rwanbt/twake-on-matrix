@@ -253,10 +253,20 @@ Future<void> removeDevicesAction(
     return;
   }
   final client = Matrix.of(context).client;
-  final deviceIds = devices.map((d) => d.deviceId).toList();
+  // A stale modal cannot revoke the current session or a session already
+  // removed while the confirmation was open.
+  final availableRemoteIds = notifier
+      .notThisDevice(client)
+      .map((device) => device.deviceId)
+      .toSet();
+  final deviceIds = devices
+      .map((device) => device.deviceId)
+      .where(availableRemoteIds.contains)
+      .toSet()
+      .toList();
+  if (deviceIds.isEmpty || !notifier.tryBeginDeletingDevices()) return;
 
   try {
-    notifier.setLoadingDeletingDevices(true);
     notifier.setErrorDeletingDevices(null);
     await client.uiaRequestBackground(
       (auth) => client.deleteDevices(deviceIds, auth: auth),
