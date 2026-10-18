@@ -136,9 +136,7 @@ void _emojiViewTests() {
     await tester.pumpWidget(
       _wrap(
         KeyVerificationEmojiView(
-          emojis: [
-            for (var i = 0; i < 6; i++) KeyVerificationEmoji(i),
-          ],
+          emojis: [for (var i = 0; i < 6; i++) KeyVerificationEmoji(i)],
           onDontMatch: () {},
           onMatch: () {},
         ),

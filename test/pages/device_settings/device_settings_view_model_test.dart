@@ -35,6 +35,9 @@ Stream<Either<Failure, Success>> _success(List<Device> devices) =>
 Stream<Either<Failure, Success>> _failure() =>
     Stream.value(Left(GetDevicesFailed(exception: Exception('network error'))));
 
+Stream<Either<Failure, Success>> _empty() =>
+    Stream.value(Left(GetDevicesEmpty()));
+
 ProviderContainer _container(FakeGetDevicesInteractor interactor) {
   return ProviderContainer(
     overrides: [getDevicesInteractorProvider.overrideWithValue(interactor)],
@@ -368,6 +371,31 @@ Future<void> _manualReloadCannotInterruptRevocation() async {
   );
 }
 
+Future<void> _emptySyncCannotUnlockRevocation() async {
+  final client = await getClient();
+  final devices = [Device(deviceId: 'GHTYAJCE')];
+  final container = _container(
+    FakeGetDevicesInteractor([_success(devices), _empty()]),
+  );
+  addTearDown(container.dispose);
+  final notifier = container.read(devicesSettingsViewModelProvider.notifier);
+  await notifier.loadUserDevices(client);
+
+  expect(notifier.tryBeginDeletingDevices(), isTrue);
+  await notifier.reload(client);
+  expect(
+    container.read(devicesSettingsViewModelProvider),
+    isA<DevicesSettingsDeletingDevices>(),
+    reason: 'empty Matrix sync must not permit a second UIA revoke',
+  );
+  expect(notifier.tryBeginDeletingDevices(), isFalse);
+  notifier.setLoadingDeletingDevices(false);
+  expect(
+    container.read(devicesSettingsViewModelProvider),
+    isA<DevicesSettingsLoaded>(),
+  );
+}
+
 void main() {
   test(
     'soft reload failure after renameDevice preserves the loaded devices '
@@ -406,5 +434,9 @@ void main() {
   test(
     'manual device sync remains coalesced and busy during active revocation',
     _manualReloadCannotInterruptRevocation,
+  );
+  test(
+    'an empty Matrix sync cannot unlock an active device revocation',
+    _emptySyncCannotUnlockRevocation,
   );
 }

@@ -121,6 +121,12 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
           either.fold(
             (failure) {
               if (failure is GetDevicesEmpty) {
+                // An empty background response cannot unlock another revoke
+                // while a previously confirmed UIA transaction is pending.
+                if (preserveStateOnFailure &&
+                    state is DevicesSettingsDeletingDevices) {
+                  return;
+                }
                 state = const DevicesSettingsState.loaded(devices: []);
               } else if (failure is GetDevicesFailed) {
                 if (preserveStateOnFailure) return;
