@@ -80,7 +80,9 @@ Future<void> _savingEmptyNameIsNoOp(WidgetTester tester) async {
   );
 }
 
-Future<void> _submittingWithKeyboardSavesExactlyOnce(WidgetTester tester) async {
+Future<void> _submittingWithKeyboardSavesExactlyOnce(
+  WidgetTester tester,
+) async {
   var calls = 0;
   String? submitted;
   await _pumpView(tester, onSave: (name) async {
@@ -102,7 +104,10 @@ Future<void> _invalidKeyboardSubmitRetainsInput(WidgetTester tester) async {
   await tester.pump();
   expect(calls, 0);
   expect(find.byType(ChangeDeviceNameView), findsOneWidget);
-  expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, '   ');
+  expect(
+    tester.widget<TextField>(find.byType(TextField)).controller!.text,
+    '   ',
+  );
 }
 
 Future<void> _onSaveErrorKeepsModalOpenWithError(WidgetTester tester) async {
