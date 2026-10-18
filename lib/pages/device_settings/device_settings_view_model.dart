@@ -46,22 +46,22 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
     VerificationBannerVisibility? bannerVisibility,
     int? keysRevision,
     String? deleteError,
-    bool deleting = false,
+    bool? deleting,
   }) {
     final resolvedDevices = devices ?? _devices;
     if (resolvedDevices == null) return;
     final resolvedBannerVisibility = bannerVisibility ?? _bannerVisibility;
     final resolvedKeysRevision = keysRevision ?? _keysRevision;
-    if (deleting) {
-      state = DevicesSettingsState.deletingDevices(
-        devices: resolvedDevices,
-        bannerVisibility: resolvedBannerVisibility,
-        keysRevision: resolvedKeysRevision,
-      );
-    } else if (deleteError != null) {
+    if (deleteError != null) {
       state = DevicesSettingsState.deleteDevicesError(
         devices: resolvedDevices,
         message: deleteError,
+        bannerVisibility: resolvedBannerVisibility,
+        keysRevision: resolvedKeysRevision,
+      );
+    } else if (deleting ?? (state is DevicesSettingsDeletingDevices)) {
+      state = DevicesSettingsState.deletingDevices(
+        devices: resolvedDevices,
         bannerVisibility: resolvedBannerVisibility,
         keysRevision: resolvedKeysRevision,
       );
@@ -190,7 +190,7 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
     if (loading) {
       _transition(deleting: true);
     } else if (state is DevicesSettingsDeletingDevices) {
-      _transition();
+      _transition(deleting: false);
     }
     // A failed deletion has already moved to the error state. Do not clear
     // that error in the finally block of the deletion action.

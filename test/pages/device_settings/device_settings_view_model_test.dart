@@ -108,10 +108,11 @@ Future<void> _deletionFailureRemainsVisibleAndCannotInterruptProgress() async {
 
   notifier.setLoadingDeletingDevices(true);
   notifier.setErrorDeletingDevices(null);
+  notifier.refreshDeviceKeys();
   expect(
     container.read(devicesSettingsViewModelProvider),
     isA<DevicesSettingsDeletingDevices>(),
-    reason: 'clearing a previous error must not re-enable a delete action',
+    reason: 'clearing an error or refreshing E2EE trust must keep deletion busy',
   );
 
   notifier.setErrorDeletingDevices('M_FORBIDDEN');
@@ -122,7 +123,7 @@ Future<void> _deletionFailureRemainsVisibleAndCannotInterruptProgress() async {
   expect(error.message, 'M_FORBIDDEN');
   expect(error.devices, hasLength(2));
   expect(error.bannerVisibility, VerificationBannerVisibility.dismissed);
-  expect(error.keysRevision, 1);
+  expect(error.keysRevision, 2);
 
   notifier.setLoadingDeletingDevices(true);
   expect(
@@ -131,6 +132,11 @@ Future<void> _deletionFailureRemainsVisibleAndCannotInterruptProgress() async {
     reason: 'a user retry must clear the old failure and enter busy state',
   );
   notifier.removeDevicesFromState(['OTHER']);
+  expect(
+    container.read(devicesSettingsViewModelProvider),
+    isA<DevicesSettingsDeletingDevices>(),
+    reason: 'optimistic device-list mutation must not re-enable deletion',
+  );
   notifier.setLoadingDeletingDevices(false);
   final recovered = container.read(devicesSettingsViewModelProvider);
   expect(recovered, isA<DevicesSettingsLoaded>());
