@@ -9,6 +9,9 @@ name: Deploying on GitHub Pages
 jobs:
   deploy_preview:
     name: Deploy preview versions on pull requests
+    # Preview publication has a write token and build-time configuration.
+    # Never combine untrusted fork code with either privileged capability.
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     concurrency:
       group: gh-pages-writes
