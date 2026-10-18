@@ -112,7 +112,8 @@ Future<void> _deletionFailureRemainsVisibleAndCannotInterruptProgress() async {
   expect(
     container.read(devicesSettingsViewModelProvider),
     isA<DevicesSettingsDeletingDevices>(),
-    reason: 'clearing an error or refreshing E2EE trust must keep deletion busy',
+    reason:
+        'clearing an error or refreshing E2EE trust must keep deletion busy',
   );
 
   notifier.setErrorDeletingDevices('M_FORBIDDEN');
@@ -250,7 +251,7 @@ Future<void> _reloadDuringSoftSyncKeepsDeviceListVisible() async {
     deviceId: 'GHTYAJCE',
     displayName: 'Updated laptop',
   );
-  await refreshStarted.future;
+  await refreshStarted.future.timeout(const Duration(seconds: 10));
   final reload = notifier.reload(client);
   expect(interactor.callCount, 2);
   expect(
@@ -260,8 +261,8 @@ Future<void> _reloadDuringSoftSyncKeepsDeviceListVisible() async {
   );
 
   refresh.add(Right(GetDevicesSuccess(devices: devices)));
-  await refresh.close();
-  await Future.wait([rename, reload]);
+  await refresh.close().timeout(const Duration(seconds: 10));
+  await Future.wait([rename, reload]).timeout(const Duration(seconds: 10));
   expect(
     container.read(devicesSettingsViewModelProvider),
     isA<DevicesSettingsLoaded>(),
