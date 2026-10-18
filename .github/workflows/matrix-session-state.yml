@@ -1,0 +1,36 @@
+name: Matrix session state regression
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/matrix-session-state.yml'
+      - 'lib/pages/device_settings/device_settings_view_model.dart'
+      - 'test/pages/device_settings/device_session_isolation_test.dart'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: matrix-session-state-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  account-isolation-offline-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.38.9'
+          channel: stable
+          cache: true
+      - name: Generate Riverpod and Freezed code
+        run: |
+          flutter pub get
+          dart run build_runner build --delete-conflicting-outputs
+      - name: Verify account switching, delayed responses and offline resume
+        run: flutter test test/pages/device_settings/device_session_isolation_test.dart
