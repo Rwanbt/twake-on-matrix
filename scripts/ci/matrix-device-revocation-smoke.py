@@ -181,13 +181,26 @@ def run():
         status == 401 and result.get("errcode") == "M_UNKNOWN_TOKEN",
         "Revoked Matrix access token is still authorized",
     )
+    # Revocation must also close the sync and E2EE key-upload boundaries, not
+    # only the device-list endpoint. Never supply real cryptographic material.
+    for method, endpoint, payload in (
+        ("GET", "/_matrix/client/v3/sync?timeout=0", None),
+        ("POST", "/_matrix/client/v3/keys/upload", {"one_time_keys": {}}),
+    ):
+        status, result = request(
+            method, endpoint, token=alice_second["access_token"], payload=payload
+        )
+        require(
+            status == 401 and result.get("errcode") == "M_UNKNOWN_TOKEN",
+            "Revoked Matrix session retains sync or encryption key upload access",
+        )
     status, result = request(
         "GET", "/_matrix/client/v3/sync?timeout=0", token=alice["access_token"]
     )
     require(status == 200 and bool(result.get("next_batch")),
             "Surviving Matrix session cannot sync after revocation")
     print("PASS: disposable Synapse UIA, foreign account isolation, "
-          "second-device revocation, invalidated token and surviving sync")
+          "second-device revocation, revoked sync/key upload and surviving sync")
 
 
 if __name__ == "__main__":
