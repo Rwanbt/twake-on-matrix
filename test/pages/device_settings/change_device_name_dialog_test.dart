@@ -85,10 +85,13 @@ Future<void> _submittingWithKeyboardSavesExactlyOnce(
 ) async {
   var calls = 0;
   String? submitted;
-  await _pumpView(tester, onSave: (name) async {
-    calls++;
-    submitted = name;
-  });
+  await _pumpView(
+    tester,
+    onSave: (name) async {
+      calls++;
+      submitted = name;
+    },
+  );
   await tester.enterText(find.byType(TextField), '  Trusted laptop  ');
   await tester.testTextInput.receiveAction(TextInputAction.done);
   await tester.pump();
