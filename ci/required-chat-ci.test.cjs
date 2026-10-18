@@ -36,3 +36,12 @@ test('preview builds must reject fork heads before accessing deployment write cr
   const cleanup = read('clean-up-gh-pages.yaml')
   assert.match(cleanup, /^\s+if: \$\{\{ github\.event\.repository\.fork == false \}\}/m)
 })
+
+test('Patrol web Synapse runner cannot write checks or pull requests', () => {
+  const patrol = read('patrol-web-integration-test.yaml')
+  const testJob = patrol.split(/^  patrol-web:\s*$/m)[1]?.split(/^  [a-z][\w-]*:\s*$/m)[0]
+  assert.ok(testJob, 'Patrol web test job must exist')
+  assert.match(testJob, /permissions:\s*\r?\n\s+contents: read/)
+  assert.doesNotMatch(testJob, /^\s+(?:checks|pull-requests|contents): write\s*$/m)
+  assert.match(testJob, /upload-artifact@/)
+})
