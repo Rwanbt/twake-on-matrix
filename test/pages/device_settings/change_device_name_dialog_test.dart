@@ -112,6 +112,34 @@ Future<void> _invalidKeyboardSubmitRetainsInput(WidgetTester tester) async {
   );
 }
 
+Future<void> _compactScreenKeepsDeviceNameKeyboardWorkflow(
+  WidgetTester tester,
+) async {
+  // A narrow mobile viewport must keep the control usable and its field
+  // accessible through the keyboard, not just render on desktop.
+  tester.view.physicalSize = const Size(320, 640);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  String? submitted;
+  await _pumpView(tester, onSave: (name) async => submitted = name);
+  await tester.pumpAndSettle();
+
+  expect(tester.takeException(), isNull);
+  expect(
+    tester.getSize(find.byType(ChangeDeviceNameView)).width,
+    lessThanOrEqualTo(320),
+  );
+  final field = tester.widget<TextField>(find.byType(TextField));
+  expect(field.textInputAction, TextInputAction.done);
+
+  await tester.enterText(find.byType(TextField), 'Compact phone');
+  await tester.testTextInput.receiveAction(TextInputAction.done);
+  await tester.pump();
+  expect(submitted, 'Compact phone');
+}
+
 Future<void> _onSaveErrorKeepsModalOpenWithError(WidgetTester tester) async {
   await _pumpAndTapSave(
     tester,
@@ -160,6 +188,11 @@ void main() {
   testWidgets(
     'invalid keyboard submission preserves the dialog and entered content',
     _invalidKeyboardSubmitRetainsInput,
+  );
+
+  testWidgets(
+    'compact 320px layout permits accessible keyboard submission',
+    _compactScreenKeepsDeviceNameKeyboardWorkflow,
   );
 
   testWidgets(
