@@ -175,8 +175,12 @@ Future<void> _deviceListExcludesCurrentAndSortsByLastSeen() async {
 
 Future<void> _softReloadRetainsVerificationState() async {
   final client = await getClient();
-  final previous = [Device(deviceId: 'GHTYAJCE', displayName: 'Laptop')];
-  final updated = [Device(deviceId: 'GHTYAJCE', displayName: 'Trusted laptop')];
+  // FakeMatrixApi supports updateDevice for this fixture ID.
+  const supportedDeviceId = 'QBUAZIFURK';
+  final previous = [Device(deviceId: supportedDeviceId, displayName: 'Laptop')];
+  final updated = [
+    Device(deviceId: supportedDeviceId, displayName: 'Trusted laptop'),
+  ];
   final container = _container(
     FakeGetDevicesInteractor([_success(previous), _success(updated)]),
   );
@@ -188,7 +192,7 @@ Future<void> _softReloadRetainsVerificationState() async {
 
   await notifier.renameDevice(
     client: client,
-    deviceId: 'GHTYAJCE',
+    deviceId: supportedDeviceId,
     displayName: 'Trusted laptop',
   );
   final state = container.read(devicesSettingsViewModelProvider);
@@ -231,7 +235,8 @@ Future<void> _concurrentSyncIsCoalescedAndFailureCanRetry() async {
 
 Future<void> _reloadDuringSoftSyncKeepsDeviceListVisible() async {
   final client = await getClient();
-  final devices = [Device(deviceId: 'GHTYAJCE', displayName: 'Laptop')];
+  const supportedDeviceId = 'QBUAZIFURK';
+  final devices = [Device(deviceId: supportedDeviceId, displayName: 'Laptop')];
   final refreshStarted = Completer<void>();
   final refresh = StreamController<Either<Failure, Success>>(
     onListen: refreshStarted.complete,
@@ -248,7 +253,7 @@ Future<void> _reloadDuringSoftSyncKeepsDeviceListVisible() async {
 
   final rename = notifier.renameDevice(
     client: client,
-    deviceId: 'GHTYAJCE',
+    deviceId: supportedDeviceId,
     displayName: 'Updated laptop',
   );
   await refreshStarted.future.timeout(const Duration(seconds: 10));
