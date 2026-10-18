@@ -43,13 +43,12 @@ class _QueuedDevices extends GetDevicesInteractor {
   }
 }
 
-Stream<Either<Failure, Success>> _devices(String name) => Stream.value(
-      Right(GetDevicesSuccess(devices: [Device(deviceId: name)])),
-    );
+Stream<Either<Failure, Success>> _devices(String name) =>
+    Stream.value(Right(GetDevicesSuccess(devices: [Device(deviceId: name)])));
 
 Stream<Either<Failure, Success>> _offline() => Stream.value(
-      Left(GetDevicesFailed(exception: Exception('temporarily offline'))),
-    );
+  Left(GetDevicesFailed(exception: Exception('temporarily offline'))),
+);
 
 ProviderContainer _createContainer(_QueuedDevices interactor) {
   final container = ProviderContainer(
@@ -62,162 +61,187 @@ ProviderContainer _createContainer(_QueuedDevices interactor) {
 List<String> _deviceIds(ProviderContainer container) {
   final state = container.read(devicesSettingsViewModelProvider);
   expect(state, isA<DevicesSettingsLoaded>());
-  return (state as DevicesSettingsLoaded)
-      .devices
+  return (state as DevicesSettingsLoaded).devices
       .map((device) => device.deviceId)
       .toList();
 }
 
 void main() {
-  test('offline refresh preserves devices and later reconnect replaces them',
-      () async {
-    final client = _AccountClient('@alice:example.org', 'ALICE');
-    final interactor = _QueuedDevices([
-      _devices('OLD'),
-      _offline(),
-      _devices('NEW'),
-    ]);
-    final container = _createContainer(interactor);
-    final notifier = container.read(devicesSettingsViewModelProvider.notifier);
+  test(
+    'offline refresh preserves devices and later reconnect replaces them',
+    () async {
+      final client = _AccountClient('@alice:example.org', 'ALICE');
+      final interactor = _QueuedDevices([
+        _devices('OLD'),
+        _offline(),
+        _devices('NEW'),
+      ]);
+      final container = _createContainer(interactor);
+      final notifier = container.read(
+        devicesSettingsViewModelProvider.notifier,
+      );
 
-    await notifier.loadUserDevices(client);
-    await notifier.reload(client);
-    expect(_deviceIds(container), ['OLD']);
-    await notifier.reload(client);
-    expect(_deviceIds(container), ['NEW']);
-    expect(interactor.calls, 3);
-  });
+      await notifier.loadUserDevices(client);
+      await notifier.reload(client);
+      expect(_deviceIds(container), ['OLD']);
+      await notifier.reload(client);
+      expect(_deviceIds(container), ['NEW']);
+      expect(interactor.calls, 3);
+    },
+  );
 
-  test('switching Matrix clients does not reuse a previous account device list',
-      () async {
-    final alice = _AccountClient('@alice:example.org', 'ALICE');
-    final bob = _AccountClient('@bob:example.org', 'BOB');
-    final interactor = _QueuedDevices([_devices('ALICE'), _devices('BOB')]);
-    final container = _createContainer(interactor);
-    final notifier = container.read(devicesSettingsViewModelProvider.notifier);
+  test(
+    'switching Matrix clients does not reuse a previous account device list',
+    () async {
+      final alice = _AccountClient('@alice:example.org', 'ALICE');
+      final bob = _AccountClient('@bob:example.org', 'BOB');
+      final interactor = _QueuedDevices([_devices('ALICE'), _devices('BOB')]);
+      final container = _createContainer(interactor);
+      final notifier = container.read(
+        devicesSettingsViewModelProvider.notifier,
+      );
 
-    await notifier.loadUserDevices(alice);
-    expect(_deviceIds(container), ['ALICE']);
-    await notifier.loadUserDevices(bob);
-    expect(_deviceIds(container), ['BOB']);
-    expect(notifier.thisDevice(bob)?.deviceId, 'BOB');
-    expect(interactor.calls, 2);
-  });
+      await notifier.loadUserDevices(alice);
+      expect(_deviceIds(container), ['ALICE']);
+      await notifier.loadUserDevices(bob);
+      expect(_deviceIds(container), ['BOB']);
+      expect(notifier.thisDevice(bob)?.deviceId, 'BOB');
+      expect(interactor.calls, 2);
+    },
+  );
 
-  test('reusing a Matrix Client after login as another user invalidates devices',
-      () async {
-    final client = _AccountClient('@alice:example.org', 'ALICE');
-    final interactor = _QueuedDevices([_devices('ALICE'), _devices('BOB')]);
-    final container = _createContainer(interactor);
-    final notifier = container.read(devicesSettingsViewModelProvider.notifier);
+  test(
+    'reusing a Matrix Client after login as another user invalidates devices',
+    () async {
+      final client = _AccountClient('@alice:example.org', 'ALICE');
+      final interactor = _QueuedDevices([_devices('ALICE'), _devices('BOB')]);
+      final container = _createContainer(interactor);
+      final notifier = container.read(
+        devicesSettingsViewModelProvider.notifier,
+      );
 
-    await notifier.loadUserDevices(client);
-    expect(_deviceIds(container), ['ALICE']);
+      await notifier.loadUserDevices(client);
+      expect(_deviceIds(container), ['ALICE']);
 
-    // Some login flows reinitialize the same Client instance. Old device and
-    // trust state must not remain visible after the identity has changed.
-    client.userID = '@bob:example.org';
-    client.deviceID = 'BOB';
-    expect(notifier.thisDevice(client), isNull);
-    expect(notifier.notThisDevice(client), isEmpty);
-    expect(notifier.showVerificationBanner(client), isFalse);
+      // Some login flows reinitialize the same Client instance. Old device and
+      // trust state must not remain visible after the identity has changed.
+      client.userID = '@bob:example.org';
+      client.deviceID = 'BOB';
+      expect(notifier.thisDevice(client), isNull);
+      expect(notifier.notThisDevice(client), isEmpty);
+      expect(notifier.showVerificationBanner(client), isFalse);
 
-    await notifier.loadUserDevices(client);
-    expect(_deviceIds(container), ['BOB']);
-    expect(interactor.calls, 2);
-  });
+      await notifier.loadUserDevices(client);
+      expect(_deviceIds(container), ['BOB']);
+      expect(interactor.calls, 2);
+    },
+  );
 
-  test('late old-account sync cannot reveal or overwrite new-account devices',
-      () async {
-    final alice = _AccountClient('@alice:example.org', 'ALICE');
-    final bob = _AccountClient('@bob:example.org', 'BOB');
-    final aliceResponse = Completer<Either<Failure, Success>>();
-    final interactor = _QueuedDevices([
-      Stream.fromFuture(aliceResponse.future),
-      _devices('BOB'),
-    ]);
-    final container = _createContainer(interactor);
-    final notifier = container.read(devicesSettingsViewModelProvider.notifier);
+  test(
+    'late old-account sync cannot reveal or overwrite new-account devices',
+    () async {
+      final alice = _AccountClient('@alice:example.org', 'ALICE');
+      final bob = _AccountClient('@bob:example.org', 'BOB');
+      final aliceResponse = Completer<Either<Failure, Success>>();
+      final interactor = _QueuedDevices([
+        Stream.fromFuture(aliceResponse.future),
+        _devices('BOB'),
+      ]);
+      final container = _createContainer(interactor);
+      final notifier = container.read(
+        devicesSettingsViewModelProvider.notifier,
+      );
 
-    final aliceLoad = notifier.loadUserDevices(alice);
-    await notifier.loadUserDevices(bob);
-    expect(_deviceIds(container), ['BOB']);
-    aliceResponse.complete(
-      Right(GetDevicesSuccess(devices: [Device(deviceId: 'ALICE')])),
-    );
-    await aliceLoad;
-    expect(_deviceIds(container), ['BOB']);
-  });
+      final aliceLoad = notifier.loadUserDevices(alice);
+      await notifier.loadUserDevices(bob);
+      expect(_deviceIds(container), ['BOB']);
+      aliceResponse.complete(
+        Right(GetDevicesSuccess(devices: [Device(deviceId: 'ALICE')])),
+      );
+      await aliceLoad;
+      expect(_deviceIds(container), ['BOB']);
+    },
+  );
 
-  test('old account completion cannot unlock an active new-account request',
-      () async {
-    final alice = _AccountClient('@alice:example.org', 'ALICE');
-    final bob = _AccountClient('@bob:example.org', 'BOB');
-    final oldResponse = Completer<Either<Failure, Success>>();
-    final newResponse = Completer<Either<Failure, Success>>();
-    final interactor = _QueuedDevices([
-      Stream.fromFuture(oldResponse.future),
-      Stream.fromFuture(newResponse.future),
-    ]);
-    final container = _createContainer(interactor);
-    final notifier = container.read(devicesSettingsViewModelProvider.notifier);
+  test(
+    'old account completion cannot unlock an active new-account request',
+    () async {
+      final alice = _AccountClient('@alice:example.org', 'ALICE');
+      final bob = _AccountClient('@bob:example.org', 'BOB');
+      final oldResponse = Completer<Either<Failure, Success>>();
+      final newResponse = Completer<Either<Failure, Success>>();
+      final interactor = _QueuedDevices([
+        Stream.fromFuture(oldResponse.future),
+        Stream.fromFuture(newResponse.future),
+      ]);
+      final container = _createContainer(interactor);
+      final notifier = container.read(
+        devicesSettingsViewModelProvider.notifier,
+      );
 
-    final aliceLoad = notifier.loadUserDevices(alice);
-    final bobLoad = notifier.loadUserDevices(bob);
-    oldResponse.complete(
-      Right(GetDevicesSuccess(devices: [Device(deviceId: 'ALICE')])),
-    );
-    await aliceLoad;
-    // With the second client still loading, another call must coalesce.
-    final duplicateBobLoad = notifier.loadUserDevices(bob);
-    expect(interactor.calls, 2);
-    newResponse.complete(
-      Right(GetDevicesSuccess(devices: [Device(deviceId: 'BOB')])),
-    );
-    await Future.wait([bobLoad, duplicateBobLoad]);
-    expect(_deviceIds(container), ['BOB']);
-  });
+      final aliceLoad = notifier.loadUserDevices(alice);
+      final bobLoad = notifier.loadUserDevices(bob);
+      oldResponse.complete(
+        Right(GetDevicesSuccess(devices: [Device(deviceId: 'ALICE')])),
+      );
+      await aliceLoad;
+      // With the second client still loading, another call must coalesce.
+      final duplicateBobLoad = notifier.loadUserDevices(bob);
+      expect(interactor.calls, 2);
+      newResponse.complete(
+        Right(GetDevicesSuccess(devices: [Device(deviceId: 'BOB')])),
+      );
+      await Future.wait([bobLoad, duplicateBobLoad]);
+      expect(_deviceIds(container), ['BOB']);
+    },
+  );
 
-  test('old UIA success or failure cannot mutate a new account revocation',
-      () async {
-    final alice = _AccountClient('@alice:example.org', 'ALICE');
-    final bob = _AccountClient('@bob:example.org', 'BOB');
-    // Both users have a session with the same server-issued device ID.
-    final interactor = _QueuedDevices([
-      _devices('SHARED'),
-      _devices('SHARED'),
-    ]);
-    final container = _createContainer(interactor);
-    final notifier = container.read(devicesSettingsViewModelProvider.notifier);
+  test(
+    'old UIA success or failure cannot mutate a new account revocation',
+    () async {
+      final alice = _AccountClient('@alice:example.org', 'ALICE');
+      final bob = _AccountClient('@bob:example.org', 'BOB');
+      // Both users have a session with the same server-issued device ID.
+      final interactor = _QueuedDevices([
+        _devices('SHARED'),
+        _devices('SHARED'),
+      ]);
+      final container = _createContainer(interactor);
+      final notifier = container.read(
+        devicesSettingsViewModelProvider.notifier,
+      );
 
-    await notifier.loadUserDevices(alice);
-    final aliceGeneration = notifier.tryBeginDeletingDevicesForClient(alice);
-    expect(aliceGeneration, isNotNull);
+      await notifier.loadUserDevices(alice);
+      final aliceGeneration = notifier.tryBeginDeletingDevicesForClient(alice);
+      expect(aliceGeneration, isNotNull);
 
-    await notifier.loadUserDevices(bob);
-    final bobGeneration = notifier.tryBeginDeletingDevicesForClient(bob);
-    expect(bobGeneration, isNotNull);
-    expect(notifier.tryBeginDeletingDevicesForClient(alice), isNull);
+      await notifier.loadUserDevices(bob);
+      final bobGeneration = notifier.tryBeginDeletingDevicesForClient(bob);
+      expect(bobGeneration, isNotNull);
+      expect(notifier.tryBeginDeletingDevicesForClient(alice), isNull);
 
-    notifier.finishDeletingDevicesForClient(
-      client: alice,
-      generation: aliceGeneration!,
-      removedIds: ['SHARED'],
-    );
-    notifier.finishDeletingDevicesForClient(
-      client: alice,
-      generation: aliceGeneration,
-      error: 'M_FORBIDDEN',
-    );
-    expect(container.read(devicesSettingsViewModelProvider),
-        isA<DevicesSettingsDeletingDevices>());
-    expect(notifier.notThisDevice(bob).single.deviceId, 'SHARED');
+      notifier.finishDeletingDevicesForClient(
+        client: alice,
+        generation: aliceGeneration!,
+        removedIds: ['SHARED'],
+      );
+      notifier.finishDeletingDevicesForClient(
+        client: alice,
+        generation: aliceGeneration,
+        error: 'M_FORBIDDEN',
+      );
+      expect(
+        container.read(devicesSettingsViewModelProvider),
+        isA<DevicesSettingsDeletingDevices>(),
+      );
+      expect(notifier.notThisDevice(bob).single.deviceId, 'SHARED');
 
-    notifier.finishDeletingDevicesForClient(
-      client: bob,
-      generation: bobGeneration!,
-      removedIds: ['SHARED'],
-    );
-    expect(_deviceIds(container), isEmpty);
-  });
+      notifier.finishDeletingDevicesForClient(
+        client: bob,
+        generation: bobGeneration!,
+        removedIds: ['SHARED'],
+      );
+      expect(_deviceIds(container), isEmpty);
+    },
+  );
 }

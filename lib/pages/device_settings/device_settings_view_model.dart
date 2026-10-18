@@ -125,8 +125,8 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
 
   List<Device> notThisDevice(Client client) =>
       List<Device>.from(_belongsToCurrentClient(client) ? _devices ?? [] : [])
-    ..removeWhere((d) => _isOwnDevice(d, client))
-    ..sort((a, b) => (b.lastSeenTs ?? 0).compareTo(a.lastSeenTs ?? 0));
+        ..removeWhere((d) => _isOwnDevice(d, client))
+        ..sort((a, b) => (b.lastSeenTs ?? 0).compareTo(a.lastSeenTs ?? 0));
 
   bool showVerificationBanner(Client client) {
     if (!_belongsToCurrentClient(client)) return false;

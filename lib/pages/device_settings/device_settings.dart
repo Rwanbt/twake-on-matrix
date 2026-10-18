@@ -342,9 +342,10 @@ Future<void> verifyDeviceAction(
   // Refresh only on a terminal state; a plain dialog close (cancel) is not one.
   req.onUpdate = () {
     if (notifier.deviceSessionGeneration(client) != generation) return;
-    if ({KeyVerificationState.error, KeyVerificationState.done}.contains(
-      req.state,
-    )) {
+    if ({
+      KeyVerificationState.error,
+      KeyVerificationState.done,
+    }.contains(req.state)) {
       notifier.refreshDeviceKeys();
     }
   };
