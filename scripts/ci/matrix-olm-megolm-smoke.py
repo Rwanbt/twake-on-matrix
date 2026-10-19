@@ -163,7 +163,7 @@ def room_key_delivery(sender, recipient, room_id, group):
             }
         },
     )
-    event = None
+    cleartext = None
     for _ in range(8):
         sync = api(
             "GET",
@@ -176,17 +176,28 @@ def room_key_delivery(sender, recipient, room_id, group):
             if e.get("type") == "m.room.encrypted"
             and e.get("content", {}).get("sender_key") == sender.identity["curve25519"]
         ]
-        if matching:
-            event = matching[-1]
+        for event in matching:
+            ciphertext = event["content"]["ciphertext"].get(
+                recipient.identity["curve25519"]
+            )
+            if ciphertext is None or ciphertext["type"] != 0:
+                continue
+            received = OlmPreKeyMessage(ciphertext["body"])
+            # Another still-pending Olm room_key can arrive during rotation.
+            # Only accept the key for the expected Megolm session epoch.
+            try:
+                inbound = InboundSession(
+                    recipient.account, received, sender.identity["curve25519"]
+                )
+                decoded = json.loads(inbound.decrypt(received))
+            except (ValueError, KeyError):
+                continue
+            if decoded.get("content", {}).get("session_id") == group.id:
+                cleartext = decoded
+                break
+        if cleartext is not None:
             break
-    require(event is not None, "Encrypted Olm to-device delivery was not observed")
-    ciphertext = event["content"]["ciphertext"][recipient.identity["curve25519"]]
-    require(ciphertext["type"] == 0, "Expected Olm pre-key event")
-    received = OlmPreKeyMessage(ciphertext["body"])
-    inbound = InboundSession(
-        recipient.account, received, sender.identity["curve25519"]
-    )
-    cleartext = json.loads(inbound.decrypt(received))
+    require(cleartext is not None, "Expected Olm room key epoch was not delivered")
     require(
         cleartext["sender"] == sender.user_id
         and cleartext["recipient"] == recipient.user_id
