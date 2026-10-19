@@ -1,7 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:twake_chat/pages/bootstrap/bootstrap_modal_chrome.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_emoji_view.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_error_view.dart';
+import 'package:twake_chat/pages/key_verification/key_verification_qr_choice_view.dart';
+import 'package:twake_chat/pages/key_verification/key_verification_qr_payload.dart';
+import 'package:twake_chat/pages/key_verification/key_verification_qr_scanner_view.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_request_view.dart';
+import 'package:twake_chat/pages/key_verification/key_verification_qr_scan_view.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_styles.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_success_view.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_waiting_view.dart';
@@ -39,17 +45,24 @@ class KeyVerificationDialog extends StatefulWidget {
 
 class KeyVerificationPageState extends State<KeyVerificationDialog> {
   void Function()? originalOnUpdate;
+  bool _qrConfirmationInFlight = false;
+  bool _qrChoiceInFlight = false;
+  bool _scanningQr = false;
+  String? _qrErrorMessage;
 
   @override
   void initState() {
     originalOnUpdate = widget.request.onUpdate;
     widget.request.onUpdate = () {
       originalOnUpdate?.call();
-      setState(() {});
+      if (mounted) setState(() {});
     };
     widget.request.client.getProfileFromUserId(widget.request.userId).then((p) {
+      if (!mounted) return;
       profile = p;
       setState(() {});
+    }, onError: (Object _) {
+      // A network/profile failure must not interrupt an active verification.
     });
     super.initState();
   }
@@ -68,6 +81,81 @@ class KeyVerificationPageState extends State<KeyVerificationDialog> {
   }
 
   Profile? profile;
+
+  Future<void> startSas() async {
+    if (_qrChoiceInFlight ||
+        widget.request.state != KeyVerificationState.askChoice ||
+        !widget.request.possibleMethods.contains(EventTypes.Sas)) {
+      return;
+    }
+    setState(() => _qrChoiceInFlight = true);
+    try {
+      await widget.request.continueVerification(EventTypes.Sas);
+    } catch (_) {
+      await _failQrVerification();
+    } finally {
+      if (mounted) setState(() => _qrChoiceInFlight = false);
+    }
+  }
+
+  Future<bool> scanMatrixQr(Uint8List bytes) async {
+    if (_qrChoiceInFlight ||
+        widget.request.state != KeyVerificationState.askChoice ||
+        !widget.request.possibleMethods.contains(EventTypes.QRScan) ||
+        !widget.request.possibleMethods.contains(EventTypes.Reciprocate) ||
+        !isMatrixVerificationQrPayload(bytes)) {
+      return false;
+    }
+    setState(() => _qrChoiceInFlight = true);
+    try {
+      // SDK verifies transaction ID, cross-signing keys and shared secret,
+      // and issues m.reciprocate.v1. UI never grants trust directly.
+      await widget.request.continueVerification(
+        EventTypes.Reciprocate,
+        qrDataRawBytes: bytes,
+      );
+      return widget.request.state != KeyVerificationState.askChoice;
+    } catch (_) {
+      await _failQrVerification();
+      return false;
+    } finally {
+      if (mounted) setState(() => _qrChoiceInFlight = false);
+    }
+  }
+
+  Future<void> _failQrVerification() async {
+    try {
+      await widget.request.cancel('m.invalid_message');
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _scanningQr = false;
+          _qrErrorMessage = 'The verification could not be completed.';
+        });
+      }
+    }
+  }
+
+  Future<void> confirmQrScan({required bool matches}) async {
+    if (_qrConfirmationInFlight ||
+        widget.request.state != KeyVerificationState.confirmQRScan) {
+      return;
+    }
+    setState(() => _qrConfirmationInFlight = true);
+    try {
+      if (matches) {
+        // This is the SDK's cryptographic confirmation boundary: only an
+        // explicit match by the user can advance QR verification to trusted.
+        await widget.request.acceptQRScanConfirmation();
+      } else {
+        await widget.request.cancel(KeyVerificationCodeEnum.user.code);
+      }
+    } catch (_) {
+      await _failQrVerification();
+    } finally {
+      if (mounted) setState(() => _qrConfirmationInFlight = false);
+    }
+  }
 
   Future<void> checkInput(String input) async {
     if (input.isEmpty) return;
@@ -119,8 +207,18 @@ class KeyVerificationPageState extends State<KeyVerificationDialog> {
     final buttons = <Widget>[];
     switch (widget.request.state) {
       case KeyVerificationState.showQRSuccess:
+        // Scanning is complete, but the other device must still confirm the
+        // green shield before the SDK reaches the verified/done state.
+        body = const KeyVerificationQrScanView(waitingForPartner: true);
+        break;
       case KeyVerificationState.confirmQRScan:
-        throw 'Not implemented';
+        body = KeyVerificationQrScanView(
+          waitingForPartner: false,
+          busy: _qrConfirmationInFlight,
+          onMatch: () => confirmQrScan(matches: true),
+          onDontMatch: () => confirmQrScan(matches: false),
+        );
+        break;
       case KeyVerificationState.askSSSS:
         // prompt the user for their ssss passphrase / key
         final textEditingController = TextEditingController();
@@ -198,6 +296,30 @@ class KeyVerificationPageState extends State<KeyVerificationDialog> {
         );
         break;
       case KeyVerificationState.askChoice:
+        final qr = widget.request.qrCode;
+        final showQr =
+            widget.request.possibleMethods.contains(EventTypes.QRShow) &&
+                qr != null;
+        final canScan =
+            widget.request.possibleMethods.contains(EventTypes.QRScan) &&
+                widget.request.possibleMethods.contains(EventTypes.Reciprocate);
+        if (_scanningQr && canScan) {
+          body = KeyVerificationQrScannerView(
+            onScan: scanMatrixQr,
+            onCancel: () => setState(() => _scanningQr = false),
+          );
+        } else {
+          body = KeyVerificationQrChoiceView(
+            qrBytes: showQr ? Uint8List.fromList(qr!.qrDataRawBytes) : null,
+            canScan: canScan,
+            canUseSas: widget.request.possibleMethods.contains(EventTypes.Sas),
+            busy: _qrChoiceInFlight,
+            onScan: () => setState(() => _scanningQr = true),
+            onSas: startSas,
+            errorMessage: _qrErrorMessage,
+          );
+        }
+        break;
       case KeyVerificationState.waitingAccept:
         body = const KeyVerificationWaitingView();
         break;

@@ -33,8 +33,8 @@ abstract class ClientManager {
         migratedFromLegacyKey = rawClientNames != null;
       }
       if (rawClientNames != null) {
-        final clientNamesList = (jsonDecode(rawClientNames) as List)
-            .cast<String>();
+        final clientNamesList =
+            (jsonDecode(rawClientNames) as List).cast<String>();
         clientNames.addAll(clientNamesList);
       }
     } catch (e, s) {
@@ -126,13 +126,19 @@ abstract class ClientManager {
   static Future<Client> createClient(String clientName) async {
     return TwakeClient(
       clientName,
-      httpClient: PlatformInfos.isAndroid
-          ? CustomHttpClient.createHTTPClient()
-          : null,
+      httpClient:
+          PlatformInfos.isAndroid ? CustomHttpClient.createHTTPClient() : null,
       verificationMethods: {
         KeyVerificationMethod.numbers,
         if (kIsWeb || PlatformInfos.isMobile || PlatformInfos.isLinux)
           KeyVerificationMethod.emoji,
+        // The Matrix SDK advertises QR methods only when the required
+        // cross-signing keys are available. Every Flutter target can display
+        // its binary QR payload, but raw scanner bytes are available only on
+        // the qr_code_scanner Android/iOS implementations.
+        KeyVerificationMethod.qrShow,
+        if (!kIsWeb && (PlatformInfos.isAndroid || PlatformInfos.isIOS))
+          KeyVerificationMethod.qrScan,
       },
       importantStateEvents: <String>{
         // To make room emotes work
