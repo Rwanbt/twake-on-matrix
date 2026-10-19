@@ -192,5 +192,17 @@ class _QrCodePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _QrCodePainter oldDelegate) {
+    // Do not show the previous verification transaction's keys or secret.
+    if (qrImage.moduleCount != oldDelegate.qrImage.moduleCount) return true;
+    for (var row = 0; row < qrImage.moduleCount; row++) {
+      for (var column = 0; column < qrImage.moduleCount; column++) {
+        if (qrImage.isDark(row, column) !=
+            oldDelegate.qrImage.isDark(row, column)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 }

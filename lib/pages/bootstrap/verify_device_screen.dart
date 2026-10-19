@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:twake_chat/generated/l10n/app_localizations.dart';
 import 'package:twake_chat/pages/bootstrap/bootstrap_modal_chrome.dart';
 import 'package:twake_chat/pages/bootstrap/recovery_key_form_view.dart';
@@ -9,6 +11,9 @@ import 'package:twake_chat/pages/bootstrap/verify_device_view_model.dart';
 import 'package:twake_chat/pages/bootstrap/verify_device_view_style.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_emoji_view.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_error_view.dart';
+import 'package:twake_chat/pages/key_verification/key_verification_qr_choice_view.dart';
+import 'package:twake_chat/pages/key_verification/key_verification_qr_scan_view.dart';
+import 'package:twake_chat/pages/key_verification/key_verification_qr_scanner_view.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_success_view.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_waiting_view.dart';
 import 'package:twake_chat/utils/responsive/responsive_utils.dart';
@@ -105,9 +110,9 @@ class VerifyDeviceScreen extends ConsumerWidget {
           onReset: () => notifier.resetEncryption(onResetEncryption),
         );
       case VerifyDeviceRecoveryKeyFormState(
-        :final initialValue,
-        :final errorText,
-      ):
+          :final initialValue,
+          :final errorText,
+        ):
         final mismatchMessage = L10n.of(context)!.recoveryKeyDoesntMatch;
         return RecoveryKeyFormView(
           onVerify: (recoveryKey) async {
@@ -120,8 +125,20 @@ class VerifyDeviceScreen extends ConsumerWidget {
           initialValue: initialValue,
           initialErrorText: errorText,
         );
-      case VerifyDeviceSasState(:final request):
-        return _buildSasContent(context, request: request, notifier: notifier);
+      case VerifyDeviceSasState(
+          :final request,
+          :final isScanningQr,
+          :final isQrInFlight,
+          :final qrErrorMessage,
+        ):
+        return _buildSasContent(
+          context,
+          request: request,
+          notifier: notifier,
+          isScanningQr: isScanningQr,
+          isQrInFlight: isQrInFlight,
+          qrErrorMessage: qrErrorMessage,
+        );
       case VerifyDeviceChooserState():
         return VerifyDeviceView(
           mascotWidth: isMobile
@@ -140,8 +157,41 @@ class VerifyDeviceScreen extends ConsumerWidget {
     BuildContext context, {
     required KeyVerification request,
     required VerifyDeviceViewModel notifier,
+    required bool isScanningQr,
+    required bool isQrInFlight,
+    String? qrErrorMessage,
   }) {
     switch (request.state) {
+      case KeyVerificationState.askChoice:
+        final qr = request.qrCode;
+        final showQr =
+            request.possibleMethods.contains(EventTypes.QRShow) && qr != null;
+        final canScan = request.possibleMethods.contains(EventTypes.QRScan) &&
+            request.possibleMethods.contains(EventTypes.Reciprocate);
+        if (isScanningQr && canScan) {
+          return KeyVerificationQrScannerView(
+            onScan: notifier.scanMatrixQr,
+            onCancel: notifier.cancelQrScan,
+          );
+        }
+        return KeyVerificationQrChoiceView(
+          qrBytes: showQr ? Uint8List.fromList(qr!.qrDataRawBytes) : null,
+          canScan: canScan,
+          canUseSas: request.possibleMethods.contains(EventTypes.Sas),
+          busy: isQrInFlight,
+          onScan: notifier.startQrScan,
+          onSas: notifier.startSasChoice,
+          errorMessage: qrErrorMessage,
+        );
+      case KeyVerificationState.confirmQRScan:
+        return KeyVerificationQrScanView(
+          waitingForPartner: false,
+          busy: isQrInFlight,
+          onMatch: () => notifier.confirmQrScan(matches: true),
+          onDontMatch: () => notifier.confirmQrScan(matches: false),
+        );
+      case KeyVerificationState.showQRSuccess:
+        return const KeyVerificationQrScanView(waitingForPartner: true);
       case KeyVerificationState.askSas:
         if (request.sasTypes.contains('emoji')) {
           return KeyVerificationEmojiView(
@@ -161,13 +211,10 @@ class VerifyDeviceScreen extends ConsumerWidget {
           canceledReason: request.canceledReason,
           onClose: notifier.dismissSasRequest,
         );
-      case KeyVerificationState.askChoice:
       case KeyVerificationState.waitingAccept:
       case KeyVerificationState.waitingSas:
       case KeyVerificationState.askAccept:
       case KeyVerificationState.askSSSS:
-      case KeyVerificationState.showQRSuccess:
-      case KeyVerificationState.confirmQRScan:
         return const KeyVerificationWaitingView();
     }
   }

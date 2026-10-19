@@ -100,4 +100,35 @@ void main() {
         isNull);
     expect(calls, 0);
   });
+
+  testWidgets(
+      'a new Matrix transaction redraws QR rather than retaining stale pixels',
+      (
+    tester,
+  ) async {
+    final original = _matrixQrPayload();
+    final replacement = Uint8List.fromList(original);
+    replacement[replacement.length - 1] ^= 0xff;
+
+    Future<CustomPainter> display(Uint8List bytes) async {
+      await tester.pumpWidget(
+        _wrap(TwakeQrCodeView.fromBytes(bytes: bytes, size: 208)),
+      );
+      return tester
+          .widget<CustomPaint>(
+            find.descendant(
+              of: find.byType(TwakeQrCodeView),
+              matching: find.byType(CustomPaint),
+            ),
+          )
+          .painter!;
+    }
+
+    final before = await display(original);
+    final after = await display(replacement);
+    expect(after.shouldRepaint(before), isTrue);
+    final unchanged = await display(Uint8List.fromList(replacement));
+    expect(unchanged.shouldRepaint(after), isFalse);
+    expect(tester.takeException(), isNull);
+  });
 }

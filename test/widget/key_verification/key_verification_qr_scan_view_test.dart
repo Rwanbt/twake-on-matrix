@@ -55,12 +55,15 @@ void main() {
 
     expect(find.text('Device verified'), findsNothing);
     expect(matches, 0);
-    await tester.tap(find.text("Don't match"));
+    final l10n = L10n.of(
+      tester.element(find.byType(KeyVerificationQrScanView)),
+    )!;
+    await tester.tap(find.text(l10n.theyDontMatch));
     await tester.pump();
     expect(rejected, 1);
     expect(matches, 0, reason: 'Rejecting QR must not confirm SDK trust');
 
-    await tester.tap(find.text('Match'));
+    await tester.tap(find.text(l10n.theyMatch));
     await tester.pump();
     expect(matches, 1);
     expect(tester.takeException(), isNull);
@@ -104,8 +107,9 @@ void main() {
         ),
       ),
     );
-    await tester.ensureVisible(find.text("Don't match"));
-    Focus.of(tester.element(find.text("Don't match"))).requestFocus();
+    final rejectButton = find.byType(OutlinedButton);
+    await tester.ensureVisible(rejectButton);
+    Focus.of(tester.element(rejectButton)).requestFocus();
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
@@ -131,7 +135,10 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Match'), findsOneWidget);
-    expect(find.text("Don't match"), findsOneWidget);
+    final l10n = L10n.of(
+      tester.element(find.byType(KeyVerificationQrScanView)),
+    )!;
+    expect(find.text(l10n.theyMatch), findsOneWidget);
+    expect(find.text(l10n.theyDontMatch), findsOneWidget);
   });
 }
