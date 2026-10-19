@@ -1,0 +1,52 @@
+name: Matrix Flutter SDK live session and recovery storage
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/matrix-flutter-sdk-live.yml'
+      - 'test/integration_test/matrix_sdk_live_synapse_test.dart'
+      - 'test/data/repository/recovery_key_storage_repository_impl_test.dart'
+      - 'lib/data/repository/recovery_key_storage_repository_impl.dart'
+      - 'lib/utils/matrix_sdk_extensions/twake_client.dart'
+      - 'scripts/integration-server-synapse.sh'
+      - 'integration_test/synapse/data/homeserver.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sdk-session-and-storage:
+    name: SDK session and mocked platform secure storage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.38.9'
+          channel: stable
+          cache: true
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+      - name: Compile native Vodozemac engine for real Matrix SDK Client
+        run: |
+          set -euo pipefail
+          VODOZEMAC_RUST="$(find "$HOME/.pub-cache/hosted/pub.dev" -maxdepth 3 -type d -path '*/flutter_vodozemac-*/rust' | head -n 1)"
+          test -n "$VODOZEMAC_RUST"
+          (cd "$VODOZEMAC_RUST" && cargo build)
+          mkdir -p vodozemac/debug
+          find "$VODOZEMAC_RUST/target/debug" -name libvodozemac_bindings_dart.so -exec cp '{}' vodozemac/debug/ \;
+          test -s vodozemac/debug/libvodozemac_bindings_dart.so
+      - name: Start disposable loopback Synapse
+        run: ./scripts/integration-server-synapse.sh
+      - name: Real Matrix SDK reconnect and invalid token, plus secure storage repository
+        run: |
+          flutter test test/integration_test/matrix_sdk_live_synapse_test.dart --dart-define=TWAKE_LIVE_SYNAPSE=true
+          flutter test test/data/repository/recovery_key_storage_repository_impl_test.dart
+      - name: Destroy disposable homeserver
+        if: always()
+        run: docker rm -f synapse || true
