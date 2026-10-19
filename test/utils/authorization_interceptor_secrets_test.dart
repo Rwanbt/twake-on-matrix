@@ -6,7 +6,8 @@ import 'package:matrix/matrix.dart';
 import 'package:twake_chat/data/network/interceptor/authorization_interceptor.dart';
 
 void main() {
-  test('authorization request attaches a bearer token without logging it', () {
+  test('authorization request attaches a bearer token without logging it',
+      () async {
     const secret = 'SECRET_BEARER_TOKEN_NEVER_LOG';
     final interceptor = AuthorizationInterceptor()..accessToken = secret;
     final options = RequestOptions(path: '/disposable');
@@ -28,7 +29,11 @@ void main() {
       error: 'Bearer $secret',
     );
     final beforeError = logger.outputEvents.length;
-    interceptor.onError(error, ErrorInterceptorHandler());
+    final errorHandler = ErrorInterceptorHandler();
+    interceptor.onError(error, errorHandler);
+    // Dio's interceptor handler completes with the original error. Consume it
+    // deterministically so the test does not produce an unhandled async error.
+    await expectLater(errorHandler.future, throwsA(isA<DioException>()));
     final errorLogs = logger.outputEvents
         .skip(beforeError)
         .map((event) => event.toFormattedString())

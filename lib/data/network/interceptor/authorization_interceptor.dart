@@ -24,8 +24,9 @@ class AuthorizationInterceptor extends InterceptorsWrapper {
       // DioException.error/requestOptions can contain Authorization headers.
       // Preserve the status and severity without serializing sensitive data.
       final status = err.response?.statusCode;
-      Logs()
-          .e('AuthorizationInterceptor::onError: HTTP ${status ?? 'unknown'}');
+      Logs().e(
+        'AuthorizationInterceptor::onError: HTTP ${status ?? 'unknown'}',
+      );
     }
     super.onError(err, handler);
   }

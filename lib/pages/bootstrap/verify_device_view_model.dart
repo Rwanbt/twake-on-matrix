@@ -1,7 +1,9 @@
 import 'dart:typed_data';
+import 'dart:async';
 
 import 'package:twake_chat/domain/app_state/recovery/self_verification_state.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_qr_payload.dart';
+import 'package:twake_chat/pages/key_verification/key_verification_qr_trust_persistence.dart';
 import 'package:twake_chat/pages/bootstrap/bootstrap_providers.dart';
 import 'package:twake_chat/pages/bootstrap/bootstrap_state.dart';
 import 'package:twake_chat/pages/bootstrap/bootstrap_view_model.dart';
@@ -27,6 +29,9 @@ class VerifyDeviceViewModel extends _$VerifyDeviceViewModel {
   bool _isScanningQr = false;
   bool _isQrInFlight = false;
   String? _qrErrorMessage;
+  QRMode? _scannedQrMode;
+  bool _confirmedShownQr = false;
+  bool _persistingQrTrust = false;
   String? _recoveryKeyError;
 
   BootstrapViewModel get _bootstrapNotifier =>
@@ -146,8 +151,39 @@ class VerifyDeviceViewModel extends _$VerifyDeviceViewModel {
     _isScanningQr = false;
     _isQrInFlight = false;
     _qrErrorMessage = null;
-    request.onUpdate = _refresh;
+    _scannedQrMode = null;
+    _confirmedShownQr = false;
+    request.onUpdate = () {
+      unawaited(_persistIfDone());
+      _refresh();
+    };
     _refresh();
+  }
+
+  Future<void> _persistIfDone() async {
+    final request = _request;
+    if (request == null ||
+        _persistingQrTrust ||
+        request.state != KeyVerificationState.done ||
+        request.canceled ||
+        (_scannedQrMode == null && !_confirmedShownQr)) {
+      return;
+    }
+    _persistingQrTrust = true;
+    try {
+      await persistCompletedQrTrust(
+        request,
+        qrMode: _scannedQrMode ?? request.getOurQRMode(),
+        scanned: _scannedQrMode != null,
+      );
+      _scannedQrMode = null;
+      _confirmedShownQr = false;
+    } catch (_) {
+      _qrErrorMessage = 'Unable to save QR trust locally.';
+      if (ref.mounted) _refresh();
+    } finally {
+      _persistingQrTrust = false;
+    }
   }
 
   void startQrScan() {
@@ -202,6 +238,12 @@ class VerifyDeviceViewModel extends _$VerifyDeviceViewModel {
         EventTypes.Reciprocate,
         qrDataRawBytes: bytes,
       );
+      if (request.state == KeyVerificationState.showQRSuccess) {
+        _scannedQrMode = QRMode.values.singleWhere(
+          (mode) => mode.code == bytes[7],
+        );
+        unawaited(_persistIfDone());
+      }
       return request.state != KeyVerificationState.askChoice;
     } catch (_) {
       await _cancelFailedVerification(request);
@@ -224,6 +266,8 @@ class VerifyDeviceViewModel extends _$VerifyDeviceViewModel {
     try {
       if (matches) {
         await request.acceptQRScanConfirmation();
+        _confirmedShownQr = true;
+        await _persistIfDone();
       } else {
         await request.cancel(KeyVerificationCodeEnum.user.code);
       }

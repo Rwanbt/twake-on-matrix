@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:async';
 
 import 'package:twake_chat/pages/bootstrap/bootstrap_modal_chrome.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_emoji_view.dart';
@@ -6,6 +7,7 @@ import 'package:twake_chat/pages/key_verification/key_verification_error_view.da
 import 'package:twake_chat/pages/key_verification/key_verification_qr_choice_view.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_qr_payload.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_qr_scanner_view.dart';
+import 'package:twake_chat/pages/key_verification/key_verification_qr_trust_persistence.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_request_view.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_qr_scan_view.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_styles.dart';
@@ -49,12 +51,41 @@ class KeyVerificationPageState extends State<KeyVerificationDialog> {
   bool _qrChoiceInFlight = false;
   bool _scanningQr = false;
   String? _qrErrorMessage;
+  QRMode? _scannedQrMode;
+  bool _confirmedShownQr = false;
+  bool _persistingQrTrust = false;
+
+  Future<void> _persistIfDone() async {
+    if (_persistingQrTrust ||
+        widget.request.state != KeyVerificationState.done ||
+        widget.request.canceled ||
+        (_scannedQrMode == null && !_confirmedShownQr)) {
+      return;
+    }
+    _persistingQrTrust = true;
+    try {
+      await persistCompletedQrTrust(
+        widget.request,
+        qrMode: _scannedQrMode ?? widget.request.getOurQRMode(),
+        scanned: _scannedQrMode != null,
+      );
+      _scannedQrMode = null;
+      _confirmedShownQr = false;
+    } catch (_) {
+      if (mounted) {
+        setState(() => _qrErrorMessage = 'Unable to save QR trust locally.');
+      }
+    } finally {
+      _persistingQrTrust = false;
+    }
+  }
 
   @override
   void initState() {
     originalOnUpdate = widget.request.onUpdate;
     widget.request.onUpdate = () {
       originalOnUpdate?.call();
+      unawaited(_persistIfDone());
       if (mounted) setState(() {});
     };
     widget.request.client
@@ -119,6 +150,12 @@ class KeyVerificationPageState extends State<KeyVerificationDialog> {
         EventTypes.Reciprocate,
         qrDataRawBytes: bytes,
       );
+      if (widget.request.state == KeyVerificationState.showQRSuccess) {
+        _scannedQrMode = QRMode.values.singleWhere(
+          (mode) => mode.code == bytes[7],
+        );
+        unawaited(_persistIfDone());
+      }
       return widget.request.state != KeyVerificationState.askChoice;
     } catch (_) {
       await _failQrVerification();
@@ -152,6 +189,8 @@ class KeyVerificationPageState extends State<KeyVerificationDialog> {
         // This is the SDK's cryptographic confirmation boundary: only an
         // explicit match by the user can advance QR verification to trusted.
         await widget.request.acceptQRScanConfirmation();
+        _confirmedShownQr = true;
+        await _persistIfDone();
       } else {
         await widget.request.cancel(KeyVerificationCodeEnum.user.code);
       }

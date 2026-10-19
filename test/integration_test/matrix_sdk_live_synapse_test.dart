@@ -10,6 +10,7 @@ import 'package:matrix/matrix.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/twake_client.dart';
+import 'package:twake_chat/pages/key_verification/key_verification_qr_trust_persistence.dart';
 import 'package:twake_chat/utils/matrix_sensitive_log_guard.dart';
 // Same transitive native crypto fixture as test/fake_client.dart; the app
 // depends on flutter_vodozemac and this test loads its compiled debug library.
@@ -214,9 +215,7 @@ Future<void> _runRealQrTest() async {
   }
 
   final (negativeScanner, negativeShower) = await beginQr();
-  final tampered = Uint8List.fromList(
-    negativeShower.qrCode!.qrDataRawBytes,
-  );
+  final tampered = Uint8List.fromList(negativeShower.qrCode!.qrDataRawBytes);
   // Corrupt a byte in the real transaction ID; SDK must reject before
   // authenticating/signing anything. No mock and no synthetic crypto keys.
   tampered[10] ^= 1;
@@ -235,6 +234,14 @@ Future<void> _runRealQrTest() async {
     [first, second],
     () => negativeShower.isDone,
     'negative QR cancellation',
+  );
+  await expectLater(
+    () => persistCompletedQrTrust(
+      negativeScanner,
+      qrMode: QRMode.verifySelfTrusted,
+      scanned: true,
+    ),
+    throwsA(isA<StateError>()),
   );
 
   final (scanner, shower) = await beginQr();
@@ -258,8 +265,8 @@ Future<void> _runRealQrTest() async {
   final sharedSecret = shower.qrCode!.randomSharedSecret;
   expect(
     Logs().outputEvents.every(
-          (event) => !event.toFormattedString().contains(sharedSecret),
-        ),
+      (event) => !event.toFormattedString().contains(sharedSecret),
+    ),
     true,
     reason: 'Real QR shared secret must not survive in SDK log history',
   );
@@ -269,6 +276,18 @@ Future<void> _runRealQrTest() async {
     first.userDeviceKeys[userId]!.deviceKeys[second.deviceID]!.verified,
     true,
     reason: 'Trusted device must sign the other real device',
+  );
+  // Persist only keys the SDK already marked directVerified and only after
+  // both cryptographic sides reached done. This does not grant new trust.
+  await persistCompletedQrTrust(
+    shower,
+    qrMode: shower.getOurQRMode(),
+    scanned: false,
+  );
+  await persistCompletedQrTrust(
+    scanner,
+    qrMode: QRMode.values.singleWhere((mode) => mode.code == authenticQr[7]),
+    scanned: true,
   );
 
   await second.dispose();
