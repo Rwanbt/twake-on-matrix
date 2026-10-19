@@ -1,6 +1,7 @@
 import 'package:twake_chat/utils/logging/log_orchestrator.dart';
 import 'package:twake_chat/utils/logging/log_types.dart';
 import 'package:matrix/matrix_api_lite/utils/logs.dart';
+import 'package:twake_chat/utils/matrix_sensitive_log_guard.dart';
 
 void initMatrixLogger() {
   Logs().onLog = (LogEvent event) {
@@ -21,4 +22,7 @@ void initMatrixLogger() {
       ),
     );
   };
+  // Ensure the SDK's onLog callback passes through the QR sanitizer even if
+  // logging is initialized again after the first Matrix client was created.
+  MatrixSensitiveLogGuard.install();
 }

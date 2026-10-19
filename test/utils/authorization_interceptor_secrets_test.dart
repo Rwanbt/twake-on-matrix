@@ -5,10 +5,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix/matrix.dart';
 import 'package:twake_chat/data/network/interceptor/authorization_interceptor.dart';
 
+// Dio's public next() callback is the error propagation contract. A test
+// handler can capture it without reading _BaseHandler.future (protected).
+class _CapturingErrorHandler extends ErrorInterceptorHandler {
+  DioException? forwardedError;
+
+  @override
+  void next(DioException error) {
+    forwardedError = error;
+  }
+}
+
 void main() {
   test(
     'authorization request attaches a bearer token without logging it',
-    () async {
+    () {
       const secret = 'SECRET_BEARER_TOKEN_NEVER_LOG';
       final interceptor = AuthorizationInterceptor()..accessToken = secret;
       final options = RequestOptions(path: '/disposable');
@@ -20,30 +31,24 @@ void main() {
         options.headers[HttpHeaders.authorizationHeader],
         'Bearer $secret',
       );
-      final logged = logger.outputEvents
-          .skip(before)
-          .map((event) => event.toFormattedString())
-          .join('\n');
-      expect(logged, isNot(contains(secret)));
-      expect(logged, isNot(contains('Bearer $secret')));
 
       final error = DioException(
         requestOptions: options,
         response: Response<dynamic>(requestOptions: options, statusCode: 401),
         error: 'Bearer $secret',
       );
-      final beforeError = logger.outputEvents.length;
-      final errorHandler = ErrorInterceptorHandler();
-      interceptor.onError(error, errorHandler);
-      // Dio's interceptor handler completes with the original error. Consume it
-      // deterministically so the test does not produce an unhandled async error.
-      await expectLater(errorHandler.future, throwsA(isA<DioException>()));
-      final errorLogs = logger.outputEvents
-          .skip(beforeError)
+      final handler = _CapturingErrorHandler();
+      interceptor.onError(error, handler);
+      expect(handler.forwardedError, same(error));
+      expect(handler.forwardedError?.response?.statusCode, 401);
+
+      final logged = logger.outputEvents
+          .skip(before)
           .map((event) => event.toFormattedString())
           .join('\n');
-      expect(errorLogs, contains('HTTP 401'));
-      expect(errorLogs, isNot(contains(secret)));
+      expect(logged, contains('HTTP 401'));
+      expect(logged, isNot(contains(secret)));
+      expect(logged, isNot(contains('Bearer $secret')));
     },
   );
 }

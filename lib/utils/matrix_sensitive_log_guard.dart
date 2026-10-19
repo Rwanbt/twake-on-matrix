@@ -7,7 +7,7 @@ import 'package:matrix/matrix_api_lite/utils/logs.dart';
 /// The callback also sanitizes in-memory log history and external log sinks,
 /// while retaining ordinary error and warning messages.
 abstract final class MatrixSensitiveLogGuard {
-  static bool _installed = false;
+  static LogCallback? _guardedCallback;
 
   static final RegExp _qrSecret = RegExp(r'(\bsecret\s*:\s*)([^,}\s]+)');
 
@@ -24,11 +24,15 @@ abstract final class MatrixSensitiveLogGuard {
     if (logger.level.index > Level.warning.index) {
       logger.level = Level.warning;
     }
-    if (_installed) return;
-    _installed = true;
+    // Another subsystem (e.g. initMatrixLogger) may replace Logs.onLog.
+    // Re-wrap it when necessary instead of relying on a one-time flag.
+    if (_guardedCallback != null &&
+        identical(logger.onLog, _guardedCallback)) {
+      return;
+    }
 
     final previousCallback = logger.onLog;
-    logger.onLog = (event) {
+    final LogCallback guardCallback = (event) {
       final safeTitle = redact(event.title);
       final safeEvent = safeTitle == event.title
           ? event
@@ -46,5 +50,7 @@ abstract final class MatrixSensitiveLogGuard {
       }
       previousCallback?.call(safeEvent);
     };
+    logger.onLog = guardCallback;
+    _guardedCallback = guardCallback;
   }
 }
