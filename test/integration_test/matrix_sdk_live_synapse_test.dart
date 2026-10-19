@@ -15,7 +15,9 @@ final localSynapse = Uri.parse('http://127.0.0.1');
 
 Future<Map<String, dynamic>> _registerDisposableUser() async {
   if (localSynapse.scheme != 'http' || localSynapse.host != '127.0.0.1') {
-    throw StateError('Live SDK test is restricted to disposable loopback Synapse');
+    throw StateError(
+      'Live SDK test is restricted to disposable loopback Synapse',
+    );
   }
   final response = await http.post(
     localSynapse.resolve('/_matrix/client/v3/register'),
@@ -26,8 +28,11 @@ Future<Map<String, dynamic>> _registerDisposableUser() async {
       'auth': {'type': 'm.login.dummy'},
     }),
   );
-  expect(response.statusCode, 200,
-      reason: 'The test requires a running disposable Matrix Synapse');
+  expect(
+    response.statusCode,
+    200,
+    reason: 'The test requires a running disposable Matrix Synapse',
+  );
   final result = jsonDecode(response.body) as Map<String, dynamic>;
   expect(result['access_token'], isNotEmpty);
   return result;
@@ -74,60 +79,60 @@ void main() {
   // regular widget-test binding intercepts HttpClient and returns HTTP 400.
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  test(
-    'real TwakeClient reconnects to Synapse with the same Matrix session '
-    'and rejects an invalid bearer token',
-    () async {
-      if (!vod.isInitialized()) {
-        await vod.init(libraryPath: './vodozemac/debug/');
-      }
-      sqfliteFfiInit();
-      final temp = await Directory.systemTemp.createTemp('twake-sdk-crypto-');
-      addTearDown(() => temp.delete(recursive: true));
-      final databasePath = path.join(temp.path, 'device.sqlite');
-      final session = await _registerDisposableUser();
-      final first = await _openSdkClient(
-        'matrix-device', session, databasePath: databasePath,
-      );
-      final firstSync = await first.sync(timeout: 0);
-      expect(firstSync.nextBatch, isNotEmpty);
-      final originalOlmIdentity = first.encryption?.identityKey;
-      expect(originalOlmIdentity, isNotEmpty);
-      await first.dispose();
+  test('real TwakeClient reconnects to Synapse with the same Matrix session '
+      'and rejects an invalid bearer token', () async {
+    if (!vod.isInitialized()) {
+      await vod.init(libraryPath: './vodozemac/debug/');
+    }
+    sqfliteFfiInit();
+    final temp = await Directory.systemTemp.createTemp('twake-sdk-crypto-');
+    addTearDown(() => temp.delete(recursive: true));
+    final databasePath = path.join(temp.path, 'device.sqlite');
+    final session = await _registerDisposableUser();
+    final first = await _openSdkClient(
+      'matrix-device',
+      session,
+      databasePath: databasePath,
+    );
+    final firstSync = await first.sync(timeout: 0);
+    expect(firstSync.nextBatch, isNotEmpty);
+    final originalOlmIdentity = first.encryption?.identityKey;
+    expect(originalOlmIdentity, isNotEmpty);
+    await first.dispose();
 
-      final reconnected = await _openSdkClient(
-        'matrix-device', session,
-        databasePath: databasePath,
-        restoreStoredSession: true,
-      );
-      final resumedSync = await reconnected.sync(timeout: 0);
-      expect(resumedSync.nextBatch, isNotEmpty);
-      expect(reconnected.userID, first.userID);
-      expect(reconnected.deviceID, first.deviceID);
-      expect(reconnected.encryption?.identityKey, originalOlmIdentity,
-          reason: 'Reopening the Matrix database must retain Olm device keys');
-      await reconnected.dispose();
+    final reconnected = await _openSdkClient(
+      'matrix-device',
+      session,
+      databasePath: databasePath,
+      restoreStoredSession: true,
+    );
+    final resumedSync = await reconnected.sync(timeout: 0);
+    expect(resumedSync.nextBatch, isNotEmpty);
+    expect(reconnected.userID, first.userID);
+    expect(reconnected.deviceID, first.deviceID);
+    expect(
+      reconnected.encryption?.identityKey,
+      originalOlmIdentity,
+      reason: 'Reopening the Matrix database must retain Olm device keys',
+    );
+    await reconnected.dispose();
 
-      // Confirm the server's negative authorization response, then verify
-      // the actual SDK cannot initialize or sync with the invalid credential.
-      const invalidToken = 'not-a-valid-disposable-session-token';
-      final unauthorized = await http.get(
-        localSynapse.resolve('/_matrix/client/v3/sync?timeout=0'),
-        headers: {'authorization': 'Bearer $invalidToken'},
+    // Confirm the server's negative authorization response, then verify
+    // the actual SDK cannot initialize or sync with the invalid credential.
+    const invalidToken = 'not-a-valid-disposable-session-token';
+    final unauthorized = await http.get(
+      localSynapse.resolve('/_matrix/client/v3/sync?timeout=0'),
+      headers: {'authorization': 'Bearer $invalidToken'},
+    );
+    expect(unauthorized.statusCode, 401);
+    await expectLater(() async {
+      final denied = await _openSdkClient(
+        'matrix-invalid-token',
+        session,
+        databasePath: path.join(temp.path, 'invalid.sqlite'),
+        token: invalidToken,
       );
-      expect(unauthorized.statusCode, 401);
-      await expectLater(
-        () async {
-          final denied = await _openSdkClient(
-            'matrix-invalid-token', session,
-            databasePath: path.join(temp.path, 'invalid.sqlite'),
-            token: invalidToken,
-          );
-          await denied.sync(timeout: 0);
-        },
-        throwsA(isA<Exception>()),
-      );
-    },
-    skip: !runLiveSynapse,
-  );
+      await denied.sync(timeout: 0);
+    }, throwsA(isA<Exception>()));
+  }, skip: !runLiveSynapse);
 }
