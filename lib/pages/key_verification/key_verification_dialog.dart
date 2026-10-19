@@ -315,7 +315,7 @@ class KeyVerificationPageState extends State<KeyVerificationDialog> {
           );
         } else {
           body = KeyVerificationQrChoiceView(
-            qrBytes: showQr ? Uint8List.fromList(qr!.qrDataRawBytes) : null,
+            qrBytes: showQr ? Uint8List.fromList(qr.qrDataRawBytes) : null,
             canScan: canScan,
             canUseSas: widget.request.possibleMethods.contains(EventTypes.Sas),
             busy: _qrChoiceInFlight,
