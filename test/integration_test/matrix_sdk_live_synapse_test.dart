@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:integration_test/integration_test.dart';
 import 'package:matrix/matrix.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/twake_client.dart';
 import 'package:vodozemac/vodozemac.dart' as vod;
@@ -51,7 +52,9 @@ Future<TwakeClient> _openSdkClient(
 }
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
+  // Live integration binding permits actual loopback HTTP requests; the
+  // regular widget-test binding intercepts HttpClient and returns HTTP 400.
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   test(
     'real TwakeClient reconnects to Synapse with the same Matrix session '
