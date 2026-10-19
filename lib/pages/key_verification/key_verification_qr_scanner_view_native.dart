@@ -75,11 +75,13 @@ class _KeyVerificationQrScannerViewState
       resumeCamera: controller.resumeCamera,
     );
     previous?.dispose();
-    unawaited(controller.resumeCamera().onError((Object _, StackTrace __) {
-      if (identical(_controller, controller)) {
-        _lifecycle.cameraFailure();
-      }
-    }));
+    unawaited(
+      controller.resumeCamera().onError((Object _, StackTrace __) {
+        if (identical(_controller, controller)) {
+          _lifecycle.cameraFailure();
+        }
+      }),
+    );
   }
 
   @override

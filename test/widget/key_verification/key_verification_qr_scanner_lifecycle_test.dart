@@ -168,7 +168,14 @@ void main() {
 
   testWidgets('camera failure and teardown are safe', (tester) async {
     final source = StreamController<Uint8List?>.broadcast(sync: true);
-    addTearDown(source.close);
+    addTearDown(() async {
+      await source.close().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => throw StateError(
+          'QR camera source close blocked after cancellation',
+        ),
+      );
+    });
     final failures = <MatrixQrScanFeedback>[];
     var calls = 0;
     final lifecycle = MatrixQrScanLifecycle(
@@ -187,7 +194,19 @@ void main() {
     await tester.pump();
     expect(failures, contains(MatrixQrScanFeedback.failed));
     expect(calls, 0);
-    await lifecycle.dispose();
+    // Subscription.cancel() can resolve on the *real* async event loop.
+    // Awaiting it directly in the fake-async testWidgets zone can deadlock.
+    // runAsync makes that boundary explicit, and the bounded timeout exposes
+    // an actual stuck cancellation rather than waiting for the 10m suite cap.
+    await tester.runAsync(() async {
+      await lifecycle.dispose().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => throw StateError(
+          'QR stream cancellation did not finish within two seconds',
+        ),
+      );
+    });
+    expect(source.hasListener, isFalse);
     source.add(_qr());
     await tester.pump();
     expect(calls, 0);
