@@ -43,10 +43,10 @@ jobs:
           test -s vodozemac/debug/libvodozemac_bindings_dart.so
       - name: Start disposable loopback Synapse
         run: ./scripts/integration-server-synapse.sh
-      - name: Real Matrix SDK reconnect and invalid token, plus secure storage repository
-        run: |
-          flutter test test/integration_test/matrix_sdk_live_synapse_test.dart --dart-define=TWAKE_LIVE_SYNAPSE=true
-          flutter test test/data/repository/recovery_key_storage_repository_impl_test.dart
+      - name: Verify SSSS repository isolation with Flutter secure-storage test backend
+        run: flutter test test/data/repository/recovery_key_storage_repository_impl_test.dart
+      - name: Verify real Matrix SDK reconnect, persistent Olm identity and invalid token
+        run: flutter test test/integration_test/matrix_sdk_live_synapse_test.dart --dart-define=TWAKE_LIVE_SYNAPSE=true
       - name: Destroy disposable homeserver
         if: always()
         run: docker rm -f synapse || true

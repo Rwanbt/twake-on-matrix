@@ -1,13 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:integration_test/integration_test.dart';
 import 'package:matrix/matrix.dart';
+import 'package:path/path.dart' as path;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/twake_client.dart';
 import 'package:vodozemac/vodozemac.dart' as vod;
-
-import '../fake_client.dart';
 
 const runLiveSynapse = bool.fromEnvironment('TWAKE_LIVE_SYNAPSE');
 final localSynapse = Uri.parse('http://127.0.0.1');
@@ -35,9 +36,15 @@ Future<Map<String, dynamic>> _registerDisposableUser() async {
 Future<TwakeClient> _openSdkClient(
   String name,
   Map<String, dynamic> session, {
+  required String databasePath,
   String? token,
 }) async {
-  final client = TwakeClient(name, database: MockDatabase());
+  // Use the same MatrixSdkDatabase implementation as ClientManager, backed
+  // by a private SQLite file. A Mockito database drops the Olm account and
+  // cannot represent a real reconnect of the same Matrix device.
+  final sqlite = await databaseFactoryFfi.openDatabase(databasePath);
+  final database = await MatrixSdkDatabase.init(name, database: sqlite);
+  final client = TwakeClient(name, database: database);
   await client.checkHomeserver(localSynapse, checkWellKnown: false);
   await client.init(
     newToken: token ?? session['access_token'] as String,
@@ -63,24 +70,49 @@ void main() {
       if (!vod.isInitialized()) {
         await vod.init(libraryPath: './vodozemac/debug/');
       }
+      sqfliteFfiInit();
+      final temp = await Directory.systemTemp.createTemp('twake-sdk-crypto-');
+      addTearDown(() => temp.delete(recursive: true));
+      final databasePath = path.join(temp.path, 'device.sqlite');
       final session = await _registerDisposableUser();
-      final first = await _openSdkClient('matrix-first', session);
+      final first = await _openSdkClient(
+        'matrix-device', session, databasePath: databasePath,
+      );
       final firstSync = await first.sync(timeout: 0);
       expect(firstSync.nextBatch, isNotEmpty);
+      final originalOlmIdentity = first.encryption?.identityKey;
+      expect(originalOlmIdentity, isNotEmpty);
+      await first.dispose();
 
-      final reconnected = await _openSdkClient('matrix-reconnected', session);
+      final reconnected = await _openSdkClient(
+        'matrix-device', session, databasePath: databasePath,
+      );
       final resumedSync = await reconnected.sync(timeout: 0);
       expect(resumedSync.nextBatch, isNotEmpty);
       expect(reconnected.userID, first.userID);
       expect(reconnected.deviceID, first.deviceID);
+      expect(reconnected.encryption?.identityKey, originalOlmIdentity,
+          reason: 'Reopening the Matrix database must retain Olm device keys');
+      await reconnected.dispose();
 
-      final denied = await _openSdkClient(
-        'matrix-invalid-token', session,
-        token: 'not-a-valid-disposable-session-token',
+      // Confirm the server's negative authorization response, then verify
+      // the actual SDK cannot initialize or sync with the invalid credential.
+      const invalidToken = 'not-a-valid-disposable-session-token';
+      final unauthorized = await http.get(
+        localSynapse.resolve('/_matrix/client/v3/sync?timeout=0'),
+        headers: {'authorization': 'Bearer $invalidToken'},
       );
+      expect(unauthorized.statusCode, 401);
       await expectLater(
-        denied.sync(timeout: 0),
-        throwsA(isA<MatrixException>()),
+        () async {
+          final denied = await _openSdkClient(
+            'matrix-invalid-token', session,
+            databasePath: path.join(temp.path, 'invalid.sqlite'),
+            token: invalidToken,
+          );
+          await denied.sync(timeout: 0);
+        },
+        throwsA(isA<Exception>()),
       );
     },
     skip: !runLiveSynapse,
