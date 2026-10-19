@@ -95,30 +95,29 @@ void main() {
     },
   );
 
-  testWidgets(
-    'QR choices cannot activate unsupported or in-flight actions',
-    (tester) async {
-      var calls = 0;
-      await tester.pumpWidget(
-        _wrap(
-          KeyVerificationQrChoiceView(
-            canScan: false,
-            canUseSas: true,
-            busy: true,
-            onScan: () => calls++,
-            onSas: () => calls++,
-          ),
+  testWidgets('QR choices cannot activate unsupported or in-flight actions', (
+    tester,
+  ) async {
+    var calls = 0;
+    await tester.pumpWidget(
+      _wrap(
+        KeyVerificationQrChoiceView(
+          canScan: false,
+          canUseSas: true,
+          busy: true,
+          onScan: () => calls++,
+          onSas: () => calls++,
         ),
-      );
-      expect(find.byIcon(Icons.qr_code_scanner), findsNothing);
-      expect(find.byType(TwakeQrCodeView), findsNothing);
-      expect(
-        tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed,
-        isNull,
-      );
-      expect(calls, 0);
-    },
-  );
+      ),
+    );
+    expect(find.byIcon(Icons.qr_code_scanner), findsNothing);
+    expect(find.byType(TwakeQrCodeView), findsNothing);
+    expect(
+      tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed,
+      isNull,
+    );
+    expect(calls, 0);
+  });
 
   testWidgets(
     'a new Matrix transaction redraws QR rather than retaining stale pixels',
