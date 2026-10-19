@@ -97,6 +97,12 @@ class Device:
 
 
 def room_key_delivery(sender, recipient, room_id, group):
+    # Consume only fresh to-device events for this exchange. A full sync
+    # without a since cursor replays previous room_key messages, which would
+    # let a rotation check inadvertently decrypt the preceding Megolm key.
+    since = api("GET", "/_matrix/client/v3/sync?timeout=0", recipient.token)[
+        "next_batch"
+    ]
     keys = api(
         "POST",
         "/_matrix/client/v3/keys/query",
@@ -159,7 +165,12 @@ def room_key_delivery(sender, recipient, room_id, group):
     )
     event = None
     for _ in range(8):
-        sync = api("GET", "/_matrix/client/v3/sync?timeout=1000", recipient.token)
+        sync = api(
+            "GET",
+            "/_matrix/client/v3/sync?timeout=1000&since=" + path_id(since),
+            recipient.token,
+        )
+        since = sync["next_batch"]
         matching = [
             e for e in sync.get("to_device", {}).get("events", [])
             if e.get("type") == "m.room.encrypted"
