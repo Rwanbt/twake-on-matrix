@@ -396,6 +396,51 @@ Future<void> _emptySyncCannotUnlockRevocation() async {
   );
 }
 
+Future<void> _emptyOfflineSyncRetainsSessionsAndTrustUntilRecovery() async {
+  final client = await getClient();
+  final cached = [
+    Device(deviceId: 'GHTYAJCE', displayName: 'This device'),
+    Device(deviceId: 'OTHER', displayName: 'Unverified phone'),
+  ];
+  final recovered = [
+    Device(deviceId: 'GHTYAJCE', displayName: 'This device'),
+    Device(deviceId: 'NEW', displayName: 'Reconnected phone'),
+  ];
+  final interactor = FakeGetDevicesInteractor([
+    _success(cached),
+    _empty(),
+    _success(recovered),
+  ]);
+  final container = _container(interactor);
+  addTearDown(container.dispose);
+  final notifier = container.read(devicesSettingsViewModelProvider.notifier);
+
+  await notifier.loadUserDevices(client);
+  notifier.dismissVerificationBanner();
+  notifier.refreshDeviceKeys();
+
+  // An incomplete/empty server response during reconnect must not erase the
+  // devices we can still verify or revoke, or reset their E2EE trust display.
+  await notifier.reload(client);
+  final offline = container.read(devicesSettingsViewModelProvider);
+  expect(offline, isA<DevicesSettingsLoaded>());
+  final retained = offline as DevicesSettingsLoaded;
+  expect(retained.devices.map((d) => d.deviceId), ['GHTYAJCE', 'OTHER']);
+  expect(retained.bannerVisibility, VerificationBannerVisibility.dismissed);
+  expect(retained.keysRevision, 1);
+
+  await notifier.reload(client);
+  final online = container.read(devicesSettingsViewModelProvider);
+  expect(online, isA<DevicesSettingsLoaded>());
+  expect(
+    (online as DevicesSettingsLoaded).devices.map((d) => d.deviceId),
+    ['GHTYAJCE', 'NEW'],
+  );
+  expect(online.bannerVisibility, VerificationBannerVisibility.dismissed);
+  expect(online.keysRevision, 1);
+  expect(interactor.callCount, 3);
+}
+
 void main() {
   test(
     'soft reload failure after renameDevice preserves the loaded devices '
@@ -438,5 +483,9 @@ void main() {
   test(
     'an empty Matrix sync cannot unlock an active device revocation',
     _emptySyncCannotUnlockRevocation,
+  );
+  test(
+    'empty offline device sync retains E2EE trust and cache until recovery',
+    _emptyOfflineSyncRetainsSessionsAndTrustUntilRecovery,
   );
 }
