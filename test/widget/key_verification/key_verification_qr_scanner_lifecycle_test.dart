@@ -32,8 +32,8 @@ void main() {
       onFeedback: (_) => renders++,
     );
     addTearDown(lifecycle.dispose);
-    final cameraPause = () async {};
-    final cameraResume = () async {};
+    Future<void> cameraPause() async {}
+    Future<void> cameraResume() async {}
     await tester.pumpWidget(const MaterialApp(home: Text('QR scanner')));
 
     lifecycle.bind(
