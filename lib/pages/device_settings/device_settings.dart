@@ -42,8 +42,9 @@ class _DevicesSettingsState extends ConsumerState<DevicesSettings> {
   Widget build(BuildContext context) {
     final client = Matrix.of(context).client;
     final notifier = ref.read(devicesSettingsViewModelProvider.notifier);
-    final refreshLabel =
-        MaterialLocalizations.of(context).refreshIndicatorSemanticLabel;
+    final refreshLabel = MaterialLocalizations.of(
+      context,
+    ).refreshIndicatorSemanticLabel;
 
     return Scaffold(
       backgroundColor: LinagoraSysColors.material().onPrimary,
