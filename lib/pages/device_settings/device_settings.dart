@@ -34,7 +34,7 @@ class DevicesSettings extends ConsumerStatefulWidget {
 }
 
 class _DevicesSettingsState extends ConsumerState<DevicesSettings> {
-  late final Future<void> _loadDevicesFuture = ref
+  late Future<void> _loadDevicesFuture = ref
       .read(devicesSettingsViewModelProvider.notifier)
       .loadUserDevices(Matrix.of(context).client);
 
@@ -42,6 +42,8 @@ class _DevicesSettingsState extends ConsumerState<DevicesSettings> {
   Widget build(BuildContext context) {
     final client = Matrix.of(context).client;
     final notifier = ref.read(devicesSettingsViewModelProvider.notifier);
+    final refreshLabel =
+        MaterialLocalizations.of(context).refreshIndicatorSemanticLabel;
 
     return Scaffold(
       backgroundColor: LinagoraSysColors.material().onPrimary,
@@ -77,6 +79,16 @@ class _DevicesSettingsState extends ConsumerState<DevicesSettings> {
                       state is DevicesSettingsError
                           ? state.exception.toString()
                           : snapshot.error.toString(),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _loadDevicesFuture = notifier.reload(client);
+                        });
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: Text(refreshLabel),
                     ),
                   ],
                 ),

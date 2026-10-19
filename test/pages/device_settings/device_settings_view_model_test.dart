@@ -432,10 +432,10 @@ Future<void> _emptyOfflineSyncRetainsSessionsAndTrustUntilRecovery() async {
   await notifier.reload(client);
   final online = container.read(devicesSettingsViewModelProvider);
   expect(online, isA<DevicesSettingsLoaded>());
-  expect(
-    (online as DevicesSettingsLoaded).devices.map((d) => d.deviceId),
-    ['GHTYAJCE', 'NEW'],
-  );
+  expect((online as DevicesSettingsLoaded).devices.map((d) => d.deviceId), [
+    'GHTYAJCE',
+    'NEW',
+  ]);
   expect(online.bannerVisibility, VerificationBannerVisibility.dismissed);
   expect(online.keysRevision, 1);
   expect(interactor.callCount, 3);

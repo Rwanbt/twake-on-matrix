@@ -169,10 +169,11 @@ class DevicesSettingsViewModel extends _$DevicesSettingsViewModel {
           either.fold(
             (failure) {
               if (failure is GetDevicesEmpty) {
-                // An empty background response cannot unlock another revoke
-                // while a previously confirmed UIA transaction is pending.
-                if (preserveStateOnFailure &&
-                    state is DevicesSettingsDeletingDevices) {
+                // A zero-device response during reconnect is not evidence
+                // that locally known sessions were revoked. Keep the cached
+                // devices, verification warnings and revocation lock until a
+                // subsequent successful device list replaces them.
+                if (preserveStateOnFailure && _devices != null) {
                   return;
                 }
                 state = const DevicesSettingsState.loaded(devices: []);
