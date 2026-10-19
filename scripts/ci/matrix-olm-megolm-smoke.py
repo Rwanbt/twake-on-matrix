@@ -21,6 +21,10 @@ from olm import (
     OlmVerifyError,
     OutboundGroupSession,
     OutboundSession,
+    PkDecryption,
+    PkDecryptionError,
+    PkEncryption,
+    PkMessage,
     ed25519_verify,
 )
 
@@ -399,6 +403,86 @@ def inspect_room_event(recipient, room_id, event_id, ciphertext, group, body):
     )
 
 
+def create_encrypted_key_backup(owner, self_signer, room_id, session, session_key):
+    # The homeserver stores ciphertext only. The backup private key stays with
+    # the user, and the public backup identity is signed by the self-signing key.
+    recovery_key = PkDecryption()
+    auth_data = sign_json(
+        {"public_key": recovery_key.public_key}, owner.user_id, self_signer
+    )
+    result = api(
+        "POST", "/_matrix/client/v3/room_keys/version", owner.token,
+        {"algorithm": "m.megolm_backup.v1.curve25519-aes-sha2", "auth_data": auth_data},
+    )
+    version = result["version"]
+    session_data = {
+        "algorithm": "m.megolm.v1.aes-sha2",
+        "sender_key": owner.identity["curve25519"],
+        "sender_claimed_keys": {"ed25519": owner.identity["ed25519"]},
+        "forwarding_curve25519_key_chain": [],
+        "session_key": session_key,
+    }
+    encrypted = PkEncryption(recovery_key.public_key).encrypt(canonical(session_data))
+    stored = {
+        "first_message_index": 0,
+        "forwarded_count": 0,
+        "is_verified": True,
+        "session_data": {
+            "ephemeral": encrypted.ephemeral_key,
+            "mac": encrypted.mac,
+            "ciphertext": encrypted.ciphertext,
+        },
+    }
+    path = (f"/_matrix/client/v3/room_keys/keys/{path_id(room_id)}/"
+            f"{path_id(session.id)}?version={path_id(version)}")
+    response = api("PUT", path, owner.token, stored)
+    require(response.get("count", 0) >= 1, "Synapse did not store the encrypted key")
+    return version, recovery_key
+
+
+def restore_encrypted_key_backup(
+    owner, replacement, stranger, self_signer, room_id, session, version, recovery_key
+):
+    # A token belonging to another account cannot read this user's backup.
+    version_path = f"/_matrix/client/v3/room_keys/version/{path_id(version)}"
+    status, _ = request("GET", version_path, token=stranger.token)
+    require(status in (403, 404), "A foreign account can read an E2EE key backup")
+    info = api("GET", version_path, replacement.token)
+    public_key = recovery_key.public_key
+    require(info["auth_data"]["public_key"] == public_key,
+            "Stored backup public key changed after login")
+    self_public = self_signer.identity_keys["ed25519"]
+    verify_signed_json(
+        info["auth_data"], owner.user_id, f"ed25519:{self_public}", self_public
+    )
+    path = (f"/_matrix/client/v3/room_keys/keys/{path_id(room_id)}/"
+            f"{path_id(session.id)}?version={path_id(version)}")
+    stored = api("GET", path, replacement.token)
+    require("session_key" not in canonical(stored),
+            "Homeserver exposed a plaintext historical Megolm session key")
+    encrypted = stored["session_data"]
+    message = PkMessage(
+        ephemeral_key=encrypted["ephemeral"],
+        mac=encrypted["mac"],
+        ciphertext=encrypted["ciphertext"],
+    )
+    try:
+        PkDecryption().decrypt(message)
+    except PkDecryptionError:
+        pass
+    else:
+        raise AssertionError("An unrelated recovery key decrypted the backup")
+    restored = json.loads(recovery_key.decrypt(message))
+    require(
+        restored["algorithm"] == "m.megolm.v1.aes-sha2"
+        and restored["sender_key"] == owner.identity["curve25519"]
+        and restored["sender_claimed_keys"]["ed25519"] == owner.identity["ed25519"]
+        and restored["session_key"],
+        "Recovered Megolm session did not match the original sender",
+    )
+    return InboundGroupSession(restored["session_key"])
+
+
 def run():
     # The imported smoke module independently enforces 127.0.0.1 loopback.
     smoke.wait_until_ready()
@@ -434,6 +518,9 @@ def run():
     peer_key = room_key_delivery(first, peer, room_id, original)
     first_id, first_ciphertext = encrypted_room_event(
         first, room_id, original, "first encrypted message"
+    )
+    backup_version, recovery_key = create_encrypted_key_backup(
+        first, self_signer, room_id, original, original_session_key
     )
     for recipient, key in ((second, second_key), (peer, peer_key)):
         inspect_room_event(
@@ -496,9 +583,18 @@ def run():
         replacement, room_id, first_id, first_ciphertext,
         replacement_historical_key, "first encrypted message",
     )
+    restored_backup_key = restore_encrypted_key_backup(
+        first, replacement, peer, self_signer, room_id, original,
+        backup_version, recovery_key,
+    )
+    inspect_room_event(
+        replacement, room_id, first_id, first_ciphertext,
+        restored_backup_key, "first encrypted message",
+    )
     print("PASS: real Synapse signed device/one-time keys, Olm to-device "
           "delivery, signature tampering rejection, cross-signing hierarchy, "
-          "Megolm rotation and explicit replacement-device history recovery")
+          "Megolm rotation, direct history recovery and encrypted server "
+          "backup with wrong-key and account-isolation rejection")
 
 
 if __name__ == "__main__":
