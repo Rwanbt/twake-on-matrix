@@ -31,7 +31,7 @@ abstract final class MatrixSensitiveLogGuard {
     }
 
     final previousCallback = logger.onLog;
-    final LogCallback guardCallback = (event) {
+    void guardCallback(LogEvent event) {
       final safeTitle = redact(event.title);
       final safeEvent = safeTitle == event.title
           ? event
@@ -48,7 +48,7 @@ abstract final class MatrixSensitiveLogGuard {
         }
       }
       previousCallback?.call(safeEvent);
-    };
+    }
     logger.onLog = guardCallback;
     _guardedCallback = guardCallback;
   }
