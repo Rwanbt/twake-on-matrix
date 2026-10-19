@@ -57,13 +57,18 @@ class KeyVerificationPageState extends State<KeyVerificationDialog> {
       originalOnUpdate?.call();
       if (mounted) setState(() {});
     };
-    widget.request.client.getProfileFromUserId(widget.request.userId).then((p) {
-      if (!mounted) return;
-      profile = p;
-      setState(() {});
-    }, onError: (Object _) {
-      // A network/profile failure must not interrupt an active verification.
-    });
+    widget.request.client
+        .getProfileFromUserId(widget.request.userId)
+        .then(
+          (p) {
+            if (!mounted) return;
+            profile = p;
+            setState(() {});
+          },
+          onError: (Object _) {
+            // A network/profile failure must not interrupt an active verification.
+          },
+        );
     super.initState();
   }
 
@@ -299,10 +304,10 @@ class KeyVerificationPageState extends State<KeyVerificationDialog> {
         final qr = widget.request.qrCode;
         final showQr =
             widget.request.possibleMethods.contains(EventTypes.QRShow) &&
-                qr != null;
+            qr != null;
         final canScan =
             widget.request.possibleMethods.contains(EventTypes.QRScan) &&
-                widget.request.possibleMethods.contains(EventTypes.Reciprocate);
+            widget.request.possibleMethods.contains(EventTypes.Reciprocate);
         if (_scanningQr && canScan) {
           body = KeyVerificationQrScannerView(
             onScan: scanMatrixQr,

@@ -16,8 +16,6 @@ class KeyVerificationQrScannerView extends StatelessWidget {
   final VoidCallback onCancel;
 
   @override
-  Widget build(BuildContext context) => TextButton(
-        onPressed: onCancel,
-        child: Text(L10n.of(context)!.cancel),
-      );
+  Widget build(BuildContext context) =>
+      TextButton(onPressed: onCancel, child: Text(L10n.of(context)!.cancel));
 }

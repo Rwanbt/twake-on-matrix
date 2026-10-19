@@ -6,37 +6,37 @@ import 'package:twake_chat/generated/l10n/app_localizations.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_qr_scan_view.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
-      locale: const Locale('en'),
-      localizationsDelegates: const [
-        L10n.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ],
-      home: Scaffold(body: Center(child: child)),
-    );
+  locale: const Locale('en'),
+  localizationsDelegates: const [
+    L10n.delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ],
+  home: Scaffold(body: Center(child: child)),
+);
 
 void main() {
-  testWidgets('a scanned QR waits for the other device without granting trust',
-      (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _wrap(const KeyVerificationQrScanView(waitingForPartner: true)),
-    );
+  testWidgets(
+    'a scanned QR waits for the other device without granting trust',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrap(const KeyVerificationQrScanView(waitingForPartner: true)),
+      );
 
-    expect(find.text('Check your other device'), findsWidgets);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
-    expect(find.byIcon(Icons.verified_user), findsOneWidget);
-    expect(
-      tester.widget<Icon>(find.byIcon(Icons.verified_user)).color,
-      Colors.green.shade700,
-    );
-    expect(find.text('Match'), findsNothing);
-    expect(find.text("Don't match"), findsNothing);
-    expect(find.text('Device verified'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.text('Check your other device'), findsWidgets);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byIcon(Icons.verified_user), findsOneWidget);
+      expect(
+        tester.widget<Icon>(find.byIcon(Icons.verified_user)).color,
+        Colors.green.shade700,
+      );
+      expect(find.text('Match'), findsNothing);
+      expect(find.text("Don't match"), findsNothing);
+      expect(find.text('Device verified'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('QR confirmation requires a deliberate positive choice', (
     tester,
@@ -85,10 +85,14 @@ void main() {
       ),
     );
 
-    expect(tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed,
-        isNull);
-    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
-        isNull);
+    expect(
+      tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed,
+      isNull,
+    );
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+      isNull,
+    );
     expect(matches, 0);
     expect(rejected, 0);
   });
@@ -107,9 +111,12 @@ void main() {
         ),
       ),
     );
-    final rejectButton = find.byType(OutlinedButton);
-    await tester.ensureVisible(rejectButton);
-    Focus.of(tester.element(rejectButton)).requestFocus();
+    final l10n = L10n.of(
+      tester.element(find.byType(KeyVerificationQrScanView)),
+    )!;
+    final rejectLabel = find.text(l10n.theyDontMatch);
+    await tester.ensureVisible(rejectLabel);
+    Focus.of(tester.element(rejectLabel)).requestFocus();
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();

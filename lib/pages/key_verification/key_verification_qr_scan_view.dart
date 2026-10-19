@@ -35,8 +35,9 @@ class KeyVerificationQrScanView extends StatelessWidget {
               ? Colors.green.shade700
               : Theme.of(context).colorScheme.primary,
           size: 56,
-          semanticLabel:
-              waitingForPartner ? l10n.checkYourOtherDevice : l10n.verifyTitle,
+          semanticLabel: waitingForPartner
+              ? l10n.checkYourOtherDevice
+              : l10n.verifyTitle,
         ),
         const SizedBox(height: 16),
         Text(

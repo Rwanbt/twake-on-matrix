@@ -110,9 +110,9 @@ class VerifyDeviceScreen extends ConsumerWidget {
           onReset: () => notifier.resetEncryption(onResetEncryption),
         );
       case VerifyDeviceRecoveryKeyFormState(
-          :final initialValue,
-          :final errorText,
-        ):
+        :final initialValue,
+        :final errorText,
+      ):
         final mismatchMessage = L10n.of(context)!.recoveryKeyDoesntMatch;
         return RecoveryKeyFormView(
           onVerify: (recoveryKey) async {
@@ -126,11 +126,11 @@ class VerifyDeviceScreen extends ConsumerWidget {
           initialErrorText: errorText,
         );
       case VerifyDeviceSasState(
-          :final request,
-          :final isScanningQr,
-          :final isQrInFlight,
-          :final qrErrorMessage,
-        ):
+        :final request,
+        :final isScanningQr,
+        :final isQrInFlight,
+        :final qrErrorMessage,
+      ):
         return _buildSasContent(
           context,
           request: request,
@@ -166,7 +166,8 @@ class VerifyDeviceScreen extends ConsumerWidget {
         final qr = request.qrCode;
         final showQr =
             request.possibleMethods.contains(EventTypes.QRShow) && qr != null;
-        final canScan = request.possibleMethods.contains(EventTypes.QRScan) &&
+        final canScan =
+            request.possibleMethods.contains(EventTypes.QRScan) &&
             request.possibleMethods.contains(EventTypes.Reciprocate);
         if (isScanningQr && canScan) {
           return KeyVerificationQrScannerView(

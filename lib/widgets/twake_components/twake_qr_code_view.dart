@@ -5,14 +5,14 @@ import 'package:qr/qr.dart';
 
 class TwakeQrCodeView extends StatelessWidget {
   const TwakeQrCodeView({super.key, required this.data, required this.size})
-      : rawBytes = null;
+    : rawBytes = null;
 
   const TwakeQrCodeView.fromBytes({
     super.key,
     required Uint8List bytes,
     required this.size,
-  })  : rawBytes = bytes,
-        data = null;
+  }) : rawBytes = bytes,
+       data = null;
 
   final String? data;
   final Uint8List? rawBytes;
@@ -23,10 +23,7 @@ class TwakeQrCodeView extends StatelessWidget {
     // Matrix verification QR codes are binary: encoding bytes as text/UTF-8
     // corrupts the random shared secret and invalidates SDK verification.
     final qrCode = rawBytes == null
-        ? QrCode.fromData(
-            data: data!,
-            errorCorrectLevel: QrErrorCorrectLevel.H,
-          )
+        ? QrCode.fromData(data: data!, errorCorrectLevel: QrErrorCorrectLevel.H)
         : QrCode.fromUint8List(
             data: rawBytes!,
             errorCorrectLevel: QrErrorCorrectLevel.H,
