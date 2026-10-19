@@ -26,8 +26,7 @@ abstract final class MatrixSensitiveLogGuard {
     }
     // Another subsystem (e.g. initMatrixLogger) may replace Logs.onLog.
     // Re-wrap it when necessary instead of relying on a one-time flag.
-    if (_guardedCallback != null &&
-        identical(logger.onLog, _guardedCallback)) {
+    if (_guardedCallback != null && identical(logger.onLog, _guardedCallback)) {
       return;
     }
 
