@@ -37,6 +37,7 @@ Future<TwakeClient> _openSdkClient(
   String name,
   Map<String, dynamic> session, {
   required String databasePath,
+  bool restoreStoredSession = false,
   String? token,
 }) async {
   // Use the same MatrixSdkDatabase implementation as ClientManager, backed
@@ -45,6 +46,16 @@ Future<TwakeClient> _openSdkClient(
   final sqlite = await databaseFactoryFfi.openDatabase(databasePath);
   final database = await MatrixSdkDatabase.init(name, database: sqlite);
   final client = TwakeClient(name, database: database);
+  if (restoreStoredSession) {
+    // Match ClientManager.getClients: a reconnect reads Olm account and
+    // credentials from the SDK database. Supplying newToken/newDeviceID would
+    // erroneously register a fresh cryptographic identity for the same ID.
+    await client.init(
+      waitForFirstSync: false,
+      waitUntilLoadCompletedLoaded: false,
+    );
+    return client;
+  }
   await client.checkHomeserver(localSynapse, checkWellKnown: false);
   await client.init(
     newToken: token ?? session['access_token'] as String,
@@ -85,7 +96,9 @@ void main() {
       await first.dispose();
 
       final reconnected = await _openSdkClient(
-        'matrix-device', session, databasePath: databasePath,
+        'matrix-device', session,
+        databasePath: databasePath,
+        restoreStoredSession: true,
       );
       final resumedSync = await reconnected.sync(timeout: 0);
       expect(resumedSync.nextBatch, isNotEmpty);
