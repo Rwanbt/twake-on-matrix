@@ -19,12 +19,12 @@ void main() {
       const bob = '@bob:127.0.0.1';
       const key = 'temporary test-only SSSS recovery secret';
 
-      final writer = RecoveryKeyStorageRepositoryImpl(storage);
+      const writer = RecoveryKeyStorageRepositoryImpl(storage);
       expect(await writer.read(userId: alice), isNull);
       await writer.write(userId: alice, recoveryKey: key);
 
       // A new instance models creating the repository again after reconnect.
-      final reopened = RecoveryKeyStorageRepositoryImpl(storage);
+      const reopened = RecoveryKeyStorageRepositoryImpl(storage);
       expect(await reopened.read(userId: alice), key);
       expect(await reopened.read(userId: bob), isNull);
       expect(await storage.read(key: 'ssss_recovery_key_$bob'), isNull);
@@ -35,7 +35,7 @@ void main() {
     'overwriting one account key does not change another account backup',
     () async {
       const storage = FlutterSecureStorage();
-      final repository = RecoveryKeyStorageRepositoryImpl(storage);
+      const repository = RecoveryKeyStorageRepositoryImpl(storage);
       const alice = '@alice:127.0.0.1';
       const bob = '@bob:127.0.0.1';
 
@@ -43,7 +43,7 @@ void main() {
       await repository.write(userId: bob, recoveryKey: 'bob-only');
       await repository.write(userId: alice, recoveryKey: 'rotated');
 
-      final reopened = RecoveryKeyStorageRepositoryImpl(storage);
+      const reopened = RecoveryKeyStorageRepositoryImpl(storage);
       expect(await reopened.read(userId: alice), 'rotated');
       expect(await reopened.read(userId: bob), 'bob-only');
       expect(await storage.read(key: 'ssss_recovery_key_$alice'), 'rotated');

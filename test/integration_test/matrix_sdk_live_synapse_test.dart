@@ -8,6 +8,9 @@ import 'package:matrix/matrix.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/twake_client.dart';
+// Same transitive native crypto fixture as test/fake_client.dart; the app
+// depends on flutter_vodozemac and this test loads its compiled debug library.
+// ignore: depend_on_referenced_packages
 import 'package:vodozemac/vodozemac.dart' as vod;
 
 const runLiveSynapse = bool.fromEnvironment('TWAKE_LIVE_SYNAPSE');
