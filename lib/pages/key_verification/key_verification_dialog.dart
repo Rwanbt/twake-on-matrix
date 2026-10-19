@@ -86,7 +86,10 @@ class KeyVerificationPageState extends State<KeyVerificationDialog> {
         return valid;
       },
     );
-    if (valid.error != null) {
+    // A wrong recovery key is caught inside the loading callback and returned
+    // as false. It does not populate FutureLoadingDialogResult.error.
+    if (!mounted) return;
+    if (valid.error != null || valid.result != true) {
       await showOkAlertDialog(
         useRootNavigator: false,
         context: context,
