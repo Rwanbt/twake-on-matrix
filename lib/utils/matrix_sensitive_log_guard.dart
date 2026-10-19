@@ -49,6 +49,7 @@ abstract final class MatrixSensitiveLogGuard {
       }
       previousCallback?.call(safeEvent);
     }
+
     logger.onLog = guardCallback;
     _guardedCallback = guardCallback;
   }
