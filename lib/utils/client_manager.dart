@@ -5,6 +5,7 @@ import 'package:twake_chat/utils/custom_http_client.dart';
 import 'package:twake_chat/utils/custom_image_resizer.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/flutter_hive_collections_database.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/twake_client.dart';
+import 'package:twake_chat/utils/matrix_sensitive_log_guard.dart';
 import 'package:twake_chat/utils/open_sqflite_db.dart';
 import 'package:twake_chat/utils/platform_infos.dart';
 import 'package:flutter/foundation.dart';
@@ -33,8 +34,8 @@ abstract class ClientManager {
         migratedFromLegacyKey = rawClientNames != null;
       }
       if (rawClientNames != null) {
-        final clientNamesList = (jsonDecode(rawClientNames) as List)
-            .cast<String>();
+        final clientNamesList =
+            (jsonDecode(rawClientNames) as List).cast<String>();
         clientNames.addAll(clientNamesList);
       }
     } catch (e, s) {
@@ -124,11 +125,11 @@ abstract class ClientManager {
       : NativeImplementationsIsolate(compute, vodozemacInit: () => vod.init());
 
   static Future<Client> createClient(String clientName) async {
+    MatrixSensitiveLogGuard.install();
     return TwakeClient(
       clientName,
-      httpClient: PlatformInfos.isAndroid
-          ? CustomHttpClient.createHTTPClient()
-          : null,
+      httpClient:
+          PlatformInfos.isAndroid ? CustomHttpClient.createHTTPClient() : null,
       verificationMethods: {
         KeyVerificationMethod.numbers,
         if (kIsWeb || PlatformInfos.isMobile || PlatformInfos.isLinux)
@@ -147,7 +148,9 @@ abstract class ClientManager {
         // To check which story room we can post in
         EventTypes.RoomPowerLevels,
       },
-      logLevel: kReleaseMode ? Level.warning : Level.verbose,
+      // SDK 7.2.2 logs raw verification QR secrets at INFO, so the
+      // console must remain below INFO even in debug builds.
+      logLevel: Level.warning,
       database: await MatrixSdkDatabase.init(
         clientName,
         database: await openSqfliteDb(name: clientName),

@@ -45,8 +45,20 @@ jobs:
         run: ./scripts/integration-server-synapse.sh
       - name: Verify SSSS repository isolation with Flutter secure-storage test backend
         run: flutter test test/data/repository/recovery_key_storage_repository_impl_test.dart
-      - name: Verify real Matrix SDK reconnect, persistent Olm identity and invalid token
-        run: flutter test test/integration_test/matrix_sdk_live_synapse_test.dart --dart-define=TWAKE_LIVE_SYNAPSE=true
+      - name: Verify real Matrix SDK QR trust and reject plaintext QR secrets in CI logs
+        run: |
+          set -euo pipefail
+          log_file="$(mktemp)"
+          trap 'rm -f "$log_file"' EXIT
+          # Ensure the detection rule itself catches the known SDK 7.2.2 leak.
+          printf '%s\n' 'm.key.verification.start: {secret: KNOWN_TEST_SECRET}' |
+            grep -Eq 'm\.key\.verification\.start.*secret:[[:space:]]*[A-Za-z0-9+/_=-]'
+          flutter test test/integration_test/matrix_sdk_live_synapse_test.dart --dart-define=TWAKE_LIVE_SYNAPSE=true 2>&1 |
+            tee "$log_file"
+          if grep -En 'm\.key\.verification\.start.*secret:[[:space:]]*[A-Za-z0-9+/_=-]' "$log_file"; then
+            echo "::error::Matrix QR shared secret appeared unredacted in SDK logs"
+            exit 1
+          fi
       - name: Destroy disposable homeserver
         if: always()
         run: docker rm -f synapse || true
