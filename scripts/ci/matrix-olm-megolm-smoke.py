@@ -222,15 +222,14 @@ def encrypted_room_event(sender, room_id, group, text):
 
 
 def inspect_room_event(recipient, room_id, event_id, ciphertext, group, body):
-    # The receiving device retrieves exactly the encrypted event, and its own
-    # independently established Olm-delivered Megolm key decrypts the content.
-    sync = api("GET", "/_matrix/client/v3/sync?timeout=0", recipient.token)
-    timeline = sync.get("rooms", {}).get("join", {}).get(room_id, {}).get(
-        "timeline", {}
-    ).get("events", [])
-    events = [event for event in timeline if event.get("event_id") == event_id]
-    require(len(events) == 1, "Encrypted event missing from recipient room timeline")
-    event = events[0]
+    # Each recipient independently fetches the exact Matrix event using its
+    # access token, then decrypts it with its Olm-delivered Megolm room key.
+    # A full /sync timeline can be limited or omit older events.
+    event = api(
+        "GET",
+        f"/_matrix/client/v3/rooms/{path_id(room_id)}/event/{path_id(event_id)}",
+        recipient.token,
+    )
     require(
         event["type"] == "m.room.encrypted"
         and event["content"]["ciphertext"] == ciphertext
