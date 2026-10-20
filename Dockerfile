@@ -75,7 +75,7 @@ RUN find /app/build/web -type f ! -name "config.json" -exec gzip -k -f {} \; && 
 # final stage runs, so a base image bump rebuilds a matching module instead of silently
 # loading a stale one. Only the static module is kept: assets are pre-compressed above, so
 # on-the-fly compression is never needed.
-FROM nginx:alpine AS brotli-builder
+FROM nginx:1.31.6-alpine AS brotli-builder
 # Both inputs compiled into the module are pinned, so two identical builds cannot
 # produce different module code: the nginx source by version and digest, and
 # ngx_brotli by commit rather than a branch. Signature checking was considered
@@ -110,7 +110,7 @@ RUN set -eux; \
     cp objs/ngx_http_brotli_static_module.so /tmp/
 
 # Final image — lean nginx:alpine with no extra packages needed
-FROM nginx:alpine AS final-image
+FROM nginx:1.31.6-alpine AS final-image
 ARG TWAKECHAT_BASE_HREF
 ENV TWAKECHAT_BASE_HREF=${TWAKECHAT_BASE_HREF:-/web/}
 ENV TWAKECHAT_LISTEN_PORT="80"
