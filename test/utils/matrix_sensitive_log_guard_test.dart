@@ -57,6 +57,27 @@ void main() {
     );
   });
 
+  test('QR warning exceptions and stack traces never escape to log sinks', () {
+    const secret = 'QR_PRIVATE_ERROR_SECRET_DO_NOT_LOG';
+    final logger = Logs();
+    final forwarded = <LogEvent>[];
+    logger.level = Level.warning;
+    logger.onLog = forwarded.add;
+    MatrixSensitiveLogGuard.install();
+
+    logger.w(
+      'Failed m.key.verification.start with secret: $secret',
+      StateError('camera exception $secret'),
+      StackTrace.fromString('verification stack $secret'),
+    );
+
+    final last = logger.outputEvents.last;
+    expect(last.toFormattedString(), isNot(contains(secret)));
+    expect(forwarded.last.toFormattedString(), isNot(contains(secret)));
+    expect(last.title, contains('[REDACTED]'));
+    expect(forwarded.last.exception?.toString(), isNot(contains(secret)));
+  });
+
   test('enable_logs cannot reactivate Matrix QR secret stdout', () {
     const secret = 'QR_PRIVATE_SHARED_SECRET_NOT_FOR_STDOUT';
     final logger = Logs();
