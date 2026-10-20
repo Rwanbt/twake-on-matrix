@@ -1,0 +1,35 @@
+name: Disposable Synapse real Olm Megolm
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/matrix-olm-megolm-smoke.yml'
+      - 'scripts/ci/matrix-olm-megolm-smoke.py'
+      - 'scripts/ci/matrix-device-revocation-smoke.py'
+      - 'scripts/integration-server-synapse.sh'
+      - 'integration_test/synapse/data/homeserver.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  olm-megolm-multidevice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6
+        with:
+          python-version: '3.12'
+      - name: Install libolm Python binding
+        run: 'python -m pip install --only-binary=:all: python-olm==3.2.16'
+      - name: Start disposable local Matrix homeserver
+        run: ./scripts/integration-server-synapse.sh
+      - name: Test real signed Olm device keys and Megolm rotation
+        run: python scripts/ci/matrix-olm-megolm-smoke.py
+      - name: Destroy disposable Matrix homeserver
+        if: always()
+        run: docker rm -f synapse || true

@@ -89,8 +89,6 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
-      checks: write
-      pull-requests: write
     strategy:
       # Each file is independent — one failure must not cancel the others.
       fail-fast: false

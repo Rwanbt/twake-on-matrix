@@ -6,6 +6,7 @@ import 'package:twake_chat/pages/key_verification/key_verification_success_view.
 import 'package:twake_chat/pages/key_verification/key_verification_waiting_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matrix/encryption.dart';
 
@@ -74,6 +75,78 @@ void _emojiViewTests() {
     await tester.tap(find.text('Match'));
     expect(dontMatchTapped, isTrue);
     expect(matchTapped, isTrue);
+  });
+
+  testWidgets('keyboard Enter can reject mismatched E2EE SAS', (tester) async {
+    var rejected = 0;
+    var confirmed = 0;
+    await tester.pumpWidget(
+      _wrap(
+        KeyVerificationEmojiView(
+          emojis: [KeyVerificationEmoji(0)],
+          onDontMatch: () => rejected++,
+          onMatch: () => confirmed++,
+        ),
+      ),
+    );
+
+    // A hardware keyboard must be able to reject a mismatched SAS without
+    // accidentally marking the device as trusted.
+    Focus.of(tester.element(find.text("Don't match"))).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+
+    expect(rejected, 1);
+    expect(confirmed, 0);
+  });
+
+  testWidgets('keyboard Space can confirm only an explicitly matched SAS', (
+    tester,
+  ) async {
+    var rejected = 0;
+    var confirmed = 0;
+    await tester.pumpWidget(
+      _wrap(
+        KeyVerificationEmojiView(
+          emojis: [KeyVerificationEmoji(0), KeyVerificationEmoji(1)],
+          onDontMatch: () => rejected++,
+          onMatch: () => confirmed++,
+        ),
+      ),
+    );
+
+    Focus.of(tester.element(find.text('Match'))).requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+
+    expect(confirmed, 1);
+    expect(rejected, 0);
+  });
+
+  testWidgets('six SAS emoji stay usable at 320px without overflow', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _wrap(
+        KeyVerificationEmojiView(
+          emojis: [for (var i = 0; i < 6; i++) KeyVerificationEmoji(i)],
+          onDontMatch: () {},
+          onMatch: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text("Don't match"), findsOneWidget);
+    expect(find.text('Match'), findsOneWidget);
   });
 }
 

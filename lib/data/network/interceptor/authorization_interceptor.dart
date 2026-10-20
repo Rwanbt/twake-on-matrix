@@ -11,20 +11,22 @@ class AuthorizationInterceptor extends InterceptorsWrapper {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     options.headers[HttpHeaders.authorizationHeader] = _bearerToken;
-    Logs().d('AuthorizationInterceptor::onRequest:accessToken: $_bearerToken');
+    // Never log bearer credentials, even at verbose/debug SDK log levels.
+    Logs().d('AuthorizationInterceptor::onRequest: authorization attached');
     super.onRequest(options, handler);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     if (err.response?.statusCode == 401) {
-      Logs().wtf(
-        'AuthorizationInterceptor::onError:',
-        err.error,
-        err.stackTrace,
-      );
+      Logs().wtf('AuthorizationInterceptor::onError: HTTP 401');
     } else {
-      Logs().e('AuthorizationInterceptor::onError:', err.error, err.stackTrace);
+      // DioException.error/requestOptions can contain Authorization headers.
+      // Preserve the status and severity without serializing sensitive data.
+      final status = err.response?.statusCode;
+      Logs().e(
+        'AuthorizationInterceptor::onError: HTTP ${status ?? 'unknown'}',
+      );
     }
     super.onError(err, handler);
   }

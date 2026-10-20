@@ -1,4 +1,9 @@
+import 'dart:typed_data';
+import 'dart:async';
+
 import 'package:twake_chat/domain/app_state/recovery/self_verification_state.dart';
+import 'package:twake_chat/pages/key_verification/key_verification_qr_payload.dart';
+import 'package:twake_chat/pages/key_verification/key_verification_qr_trust_persistence.dart';
 import 'package:twake_chat/pages/bootstrap/bootstrap_providers.dart';
 import 'package:twake_chat/pages/bootstrap/bootstrap_state.dart';
 import 'package:twake_chat/pages/bootstrap/bootstrap_view_model.dart';
@@ -21,6 +26,12 @@ class VerifyDeviceViewModel extends _$VerifyDeviceViewModel {
   bool _isStartingVerification = false;
   bool _isResetting = false;
   bool _retryErrorDismissed = false;
+  bool _isScanningQr = false;
+  bool _isQrInFlight = false;
+  String? _qrErrorMessage;
+  QRMode? _scannedQrMode;
+  bool _confirmedShownQr = false;
+  bool _persistingQrTrust = false;
   String? _recoveryKeyError;
 
   BootstrapViewModel get _bootstrapNotifier =>
@@ -81,6 +92,9 @@ class VerifyDeviceViewModel extends _$VerifyDeviceViewModel {
       return VerifyDeviceSasState(
         request: request,
         requestState: request.state,
+        isScanningQr: _isScanningQr,
+        isQrInFlight: _isQrInFlight,
+        qrErrorMessage: _qrErrorMessage,
       );
     }
 
@@ -134,8 +148,147 @@ class VerifyDeviceViewModel extends _$VerifyDeviceViewModel {
 
   void _attachRequest(KeyVerification request) {
     _request = request;
-    request.onUpdate = _refresh;
+    _isScanningQr = false;
+    _isQrInFlight = false;
+    _qrErrorMessage = null;
+    _scannedQrMode = null;
+    _confirmedShownQr = false;
+    request.onUpdate = () {
+      unawaited(_persistIfDone());
+      _refresh();
+    };
     _refresh();
+  }
+
+  Future<void> _persistIfDone() async {
+    final request = _request;
+    if (request == null ||
+        _persistingQrTrust ||
+        request.state != KeyVerificationState.done ||
+        request.canceled ||
+        (_scannedQrMode == null && !_confirmedShownQr)) {
+      return;
+    }
+    _persistingQrTrust = true;
+    try {
+      await persistCompletedQrTrust(
+        request,
+        qrMode: _scannedQrMode ?? request.getOurQRMode(),
+        scanned: _scannedQrMode != null,
+      );
+      _scannedQrMode = null;
+      _confirmedShownQr = false;
+    } catch (_) {
+      _qrErrorMessage = 'Unable to save QR trust locally.';
+      if (ref.mounted) _refresh();
+    } finally {
+      _persistingQrTrust = false;
+    }
+  }
+
+  void startQrScan() {
+    if (_isQrInFlight || _request?.state != KeyVerificationState.askChoice) {
+      return;
+    }
+    _isScanningQr = true;
+    _qrErrorMessage = null;
+    _refresh();
+  }
+
+  void cancelQrScan() {
+    if (_isQrInFlight) return;
+    _isScanningQr = false;
+    _refresh();
+  }
+
+  Future<void> startSasChoice() async {
+    final request = _request;
+    if (request == null ||
+        _isQrInFlight ||
+        request.state != KeyVerificationState.askChoice ||
+        !request.possibleMethods.contains(EventTypes.Sas)) {
+      return;
+    }
+    _isQrInFlight = true;
+    _refresh();
+    try {
+      await request.continueVerification(EventTypes.Sas);
+    } catch (_) {
+      await _cancelFailedVerification(request);
+    } finally {
+      _isQrInFlight = false;
+      if (ref.mounted) _refresh();
+    }
+  }
+
+  Future<bool> scanMatrixQr(Uint8List bytes) async {
+    final request = _request;
+    if (request == null ||
+        _isQrInFlight ||
+        request.state != KeyVerificationState.askChoice ||
+        !request.possibleMethods.contains(EventTypes.QRScan) ||
+        !request.possibleMethods.contains(EventTypes.Reciprocate) ||
+        !isMatrixVerificationQrPayload(bytes)) {
+      return false;
+    }
+    _isQrInFlight = true;
+    _refresh();
+    try {
+      await request.continueVerification(
+        EventTypes.Reciprocate,
+        qrDataRawBytes: bytes,
+      );
+      if (request.state == KeyVerificationState.showQRSuccess) {
+        _scannedQrMode = QRMode.values.singleWhere(
+          (mode) => mode.code == bytes[7],
+        );
+        unawaited(_persistIfDone());
+      }
+      return request.state != KeyVerificationState.askChoice;
+    } catch (_) {
+      await _cancelFailedVerification(request);
+      return false;
+    } finally {
+      _isQrInFlight = false;
+      if (ref.mounted) _refresh();
+    }
+  }
+
+  Future<void> confirmQrScan({required bool matches}) async {
+    final request = _request;
+    if (request == null ||
+        _isQrInFlight ||
+        request.state != KeyVerificationState.confirmQRScan) {
+      return;
+    }
+    _isQrInFlight = true;
+    _refresh();
+    try {
+      if (matches) {
+        await request.acceptQRScanConfirmation();
+        _confirmedShownQr = true;
+        await _persistIfDone();
+      } else {
+        await request.cancel(KeyVerificationCodeEnum.user.code);
+      }
+    } catch (_) {
+      await _cancelFailedVerification(request);
+    } finally {
+      _isQrInFlight = false;
+      if (ref.mounted) _refresh();
+    }
+  }
+
+  Future<void> _cancelFailedVerification(KeyVerification request) async {
+    try {
+      await request.cancel('m.invalid_message');
+    } catch (_) {
+      if (ref.mounted && identical(request, _request)) {
+        _isScanningQr = false;
+        _qrErrorMessage = 'The verification could not be completed.';
+        _refresh();
+      }
+    }
   }
 
   /// Drops a finished or failed verification request so the chooser is shown

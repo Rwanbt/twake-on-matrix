@@ -34,7 +34,7 @@ class DevicesSettings extends ConsumerStatefulWidget {
 }
 
 class _DevicesSettingsState extends ConsumerState<DevicesSettings> {
-  late final Future<void> _loadDevicesFuture = ref
+  late Future<void> _loadDevicesFuture = ref
       .read(devicesSettingsViewModelProvider.notifier)
       .loadUserDevices(Matrix.of(context).client);
 
@@ -42,6 +42,9 @@ class _DevicesSettingsState extends ConsumerState<DevicesSettings> {
   Widget build(BuildContext context) {
     final client = Matrix.of(context).client;
     final notifier = ref.read(devicesSettingsViewModelProvider.notifier);
+    final refreshLabel = MaterialLocalizations.of(
+      context,
+    ).refreshIndicatorSemanticLabel;
 
     return Scaffold(
       backgroundColor: LinagoraSysColors.material().onPrimary,
@@ -77,6 +80,16 @@ class _DevicesSettingsState extends ConsumerState<DevicesSettings> {
                       state is DevicesSettingsError
                           ? state.exception.toString()
                           : snapshot.error.toString(),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _loadDevicesFuture = notifier.reload(client);
+                        });
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: Text(refreshLabel),
                     ),
                   ],
                 ),
@@ -253,20 +266,38 @@ Future<void> removeDevicesAction(
     return;
   }
   final client = Matrix.of(context).client;
-  final deviceIds = devices.map((d) => d.deviceId).toList();
+  // A stale modal cannot revoke the current session or a session already
+  // removed while the confirmation was open.
+  final availableRemoteIds = notifier
+      .notThisDevice(client)
+      .map((device) => device.deviceId)
+      .toSet();
+  final deviceIds = devices
+      .map((device) => device.deviceId)
+      .where(availableRemoteIds.contains)
+      .toSet()
+      .toList();
+  if (deviceIds.isEmpty) return;
+  final generation = notifier.tryBeginDeletingDevicesForClient(client);
+  if (generation == null) return;
 
   try {
-    notifier.setLoadingDeletingDevices(true);
     notifier.setErrorDeletingDevices(null);
     await client.uiaRequestBackground(
       (auth) => client.deleteDevices(deviceIds, auth: auth),
     );
-    notifier.removeDevicesFromState(deviceIds);
+    notifier.finishDeletingDevicesForClient(
+      client: client,
+      generation: generation,
+      removedIds: deviceIds,
+    );
   } catch (e, s) {
     Logs().v('Error while deleting devices', e, s);
-    notifier.setErrorDeletingDevices(e.toString());
-  } finally {
-    notifier.setLoadingDeletingDevices(false);
+    notifier.finishDeletingDevicesForClient(
+      client: client,
+      generation: generation,
+      error: e.toString(),
+    );
   }
 }
 
@@ -293,6 +324,8 @@ Future<void> verifyDeviceAction(
   Device device,
 ) async {
   final client = Matrix.of(context).client;
+  final generation = notifier.deviceSessionGeneration(client);
+  if (generation == null) return;
   // Keep a handle so a dismissed loading dialog cannot orphan the request.
   final verificationFuture = client
       .userDeviceKeys[client.userID!]!
@@ -314,8 +347,14 @@ Future<void> verifyDeviceAction(
     );
     return;
   }
+  if (!context.mounted ||
+      notifier.deviceSessionGeneration(client) != generation) {
+    unawaited(req.cancel(KeyVerificationCodeEnum.user.code));
+    return;
+  }
   // Refresh only on a terminal state; a plain dialog close (cancel) is not one.
   req.onUpdate = () {
+    if (notifier.deviceSessionGeneration(client) != generation) return;
     if ({
       KeyVerificationState.error,
       KeyVerificationState.done,

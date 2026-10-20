@@ -9,6 +9,9 @@ name: Deploying on GitHub Pages
 jobs:
   deploy_preview:
     name: Deploy preview versions on pull requests
+    # Only the non-fork upstream is provisioned with deployment secrets.
+    # All forks retain unprivileged analyzer, widget and browser CI gates.
+    if: ${{ github.event.repository.fork == false && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     concurrency:
       group: gh-pages-writes
