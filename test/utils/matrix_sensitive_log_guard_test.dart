@@ -110,7 +110,10 @@ void main() {
     expect(printed.join('\n'), isNot(contains(secret)));
     expect(printed.join('\n'), contains('[REDACTED]'));
     expect(forwarded.last.toFormattedString(), isNot(contains(secret)));
-    expect(logger.outputEvents.last.toFormattedString(), isNot(contains(secret)));
+    expect(
+      logger.outputEvents.last.toFormattedString(),
+      isNot(contains(secret)),
+    );
   });
 
   test('enable_logs cannot reactivate Matrix QR secret stdout', () {
