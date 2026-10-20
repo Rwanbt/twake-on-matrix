@@ -3,7 +3,9 @@ import 'package:matrix/matrix_api_lite/utils/logs.dart';
 /// Matrix SDK 7.2.2 writes the QR shared secret in INFO key-verification
 /// events. Its logger appends events to outputEvents before calling onLog.
 ///
-/// A warning-level console floor stops raw SDK INFO events being printed.
+/// Keep the SDK console at its lowest level: its own printOut() serializes
+/// the original immutable LogEvent *after* onLog, so redacting onLog alone
+/// cannot stop raw WARNING or ERROR diagnostics being printed.
 /// The callback also sanitizes in-memory log history and external log sinks,
 /// while retaining ordinary error and warning messages.
 abstract final class MatrixSensitiveLogGuard {
@@ -21,8 +23,8 @@ abstract final class MatrixSensitiveLogGuard {
 
   static void install() {
     final logger = Logs();
-    if (logger.level.index > Level.warning.index) {
-      logger.level = Level.warning;
+    if (logger.level.index > Level.wtf.index) {
+      logger.level = Level.wtf;
     }
     // Another subsystem (e.g. initMatrixLogger) may replace Logs.onLog.
     // Re-wrap it when necessary instead of relying on a one-time flag.
@@ -53,6 +55,12 @@ abstract final class MatrixSensitiveLogGuard {
         if (history.isNotEmpty && identical(history.last, event)) {
           history[history.length - 1] = safeEvent;
         }
+      }
+      // Restore useful warnings/errors through the sanitized callback, not
+      // the SDK printOut() path that still holds the unredacted event.
+      if (event.level == Level.warning || event.level == Level.error) {
+        // ignore: avoid_print
+        print('[Matrix] ${safeEvent.toFormattedString()}');
       }
       previousCallback?.call(safeEvent);
     }

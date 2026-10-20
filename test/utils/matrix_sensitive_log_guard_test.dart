@@ -16,7 +16,7 @@ void main() {
     logger.onLog = forwarded.add;
 
     MatrixSensitiveLogGuard.install();
-    expect(logger.level, Level.warning);
+    expect(logger.level, Level.wtf);
     logger.i(
       '[Key Verification] Received type m.key.verification.start: '
       '{method: m.reciprocate.v1, secret: $secret, from_device: DEVICE1}',
@@ -65,10 +65,16 @@ void main() {
     logger.onLog = forwarded.add;
     MatrixSensitiveLogGuard.install();
 
-    logger.w(
-      'Failed m.key.verification.start with secret: $secret',
-      StateError('camera exception $secret'),
-      StackTrace.fromString('verification stack $secret'),
+    final printed = <String>[];
+    runZoned(
+      () => logger.w(
+        'Failed m.key.verification.start with secret: $secret',
+        StateError('camera exception $secret'),
+        StackTrace.fromString('verification stack $secret'),
+      ),
+      zoneSpecification: ZoneSpecification(
+        print: (self, parent, zone, line) => printed.add(line),
+      ),
     );
 
     final last = logger.outputEvents.last;
@@ -76,6 +82,35 @@ void main() {
     expect(forwarded.last.toFormattedString(), isNot(contains(secret)));
     expect(last.title, contains('[REDACTED]'));
     expect(forwarded.last.exception?.toString(), isNot(contains(secret)));
+    expect(printed.join('\n'), isNot(contains(secret)));
+    expect(printed.join('\n'), contains('[REDACTED]'));
+  });
+
+  test('QR error exceptions cannot bypass sanitization through SDK stdout', () {
+    const secret = 'QR_ERROR_LEVEL_SECRET_NOT_FOR_STDOUT';
+    final logger = Logs();
+    final forwarded = <LogEvent>[];
+    final printed = <String>[];
+    logger.level = Level.verbose;
+    logger.onLog = forwarded.add;
+    MatrixSensitiveLogGuard.install();
+
+    runZoned(
+      () => logger.e(
+        'Rejected m.key.verification.start {secret: $secret}',
+        StateError(secret),
+        StackTrace.fromString(secret),
+      ),
+      zoneSpecification: ZoneSpecification(
+        print: (self, parent, zone, line) => printed.add(line),
+      ),
+    );
+
+    expect(logger.level, Level.wtf);
+    expect(printed.join('\n'), isNot(contains(secret)));
+    expect(printed.join('\n'), contains('[REDACTED]'));
+    expect(forwarded.last.toFormattedString(), isNot(contains(secret)));
+    expect(logger.outputEvents.last.toFormattedString(), isNot(contains(secret)));
   });
 
   test('enable_logs cannot reactivate Matrix QR secret stdout', () {
@@ -94,7 +129,7 @@ void main() {
     logger.level = Level.verbose;
     AppConfig.loadFromJson({'enable_logs': true});
     expect(DebugUtils.enableLogs, true);
-    expect(logger.level, Level.warning);
+    expect(logger.level, Level.wtf);
 
     runZoned(
       () {
