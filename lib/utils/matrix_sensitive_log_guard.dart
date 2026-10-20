@@ -33,12 +33,19 @@ abstract final class MatrixSensitiveLogGuard {
     final previousCallback = logger.onLog;
     void guardCallback(LogEvent event) {
       final safeTitle = redact(event.title);
-      final safeEvent = safeTitle == event.title
+      // QR protocol failures can also serialize the shared secret in the
+      // exception or stack trace. Never forward those raw SDK diagnostics.
+      final qrEvent = event.title.contains('m.key.verification.start');
+      final safeException = qrEvent && event.exception != null
+          ? '[REDACTED QR VERIFICATION DIAGNOSTIC]'
+          : event.exception;
+      final safeStackTrace = qrEvent ? null : event.stackTrace;
+      final safeEvent = safeTitle == event.title && !qrEvent
           ? event
           : LogEvent(
               safeTitle,
-              exception: event.exception,
-              stackTrace: event.stackTrace,
+              exception: safeException,
+              stackTrace: safeStackTrace,
               level: event.level,
             );
       if (!identical(safeEvent, event)) {
