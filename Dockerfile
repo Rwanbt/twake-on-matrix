@@ -75,7 +75,7 @@ RUN find /app/build/web -type f ! -name "config.json" -exec gzip -k -f {} \; && 
 # final stage runs, so a base image bump rebuilds a matching module instead of silently
 # loading a stale one. Only the static module is kept: assets are pre-compressed above, so
 # on-the-fly compression is never needed.
-FROM nginx:1.31.6-alpine AS brotli-builder
+FROM nginx:1.31.7-alpine AS brotli-builder
 # Both inputs compiled into the module are pinned, so two identical builds cannot
 # produce different module code: the nginx source by version and digest, and
 # ngx_brotli by commit rather than a branch. Signature checking was considered
@@ -86,8 +86,8 @@ FROM nginx:1.31.6-alpine AS brotli-builder
 # build until both values below are updated, which is deliberate: it turns an
 # unreviewed upstream change into a review point, and a module compiled against
 # the wrong version would be refused at load time anyway.
-ARG NGINX_VERSION=1.31.6
-ARG NGINX_SHA256=974ed5298a5e398e008704ed5db284e655fc270c596493dbccada452448fc9f1
+ARG NGINX_VERSION=1.31.7
+ARG NGINX_SHA256=89ea8a3dc171511f7325043b50e4c036248d9fad5feb7ec809c0b82d5df42c65
 ARG NGX_BROTLI_COMMIT=a71f9312c2deb28875acc7bacfdd5695a111aa53
 RUN set -eux; \
     image_version="$(nginx -v 2>&1 | sed 's|.*/||')"; \
@@ -110,7 +110,7 @@ RUN set -eux; \
     cp objs/ngx_http_brotli_static_module.so /tmp/
 
 # Final image — lean nginx:alpine with no extra packages needed
-FROM nginx:1.31.6-alpine AS final-image
+FROM nginx:1.31.7-alpine AS final-image
 ARG TWAKECHAT_BASE_HREF
 ENV TWAKECHAT_BASE_HREF=${TWAKECHAT_BASE_HREF:-/web/}
 ENV TWAKECHAT_LISTEN_PORT="80"

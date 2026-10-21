@@ -1,12 +1,13 @@
 on:
-  pull_request:
-    branches:
-      - "main"
   push:
     branches:
       - "main"
     tags:
       - "v*.*.*"
+
+  pull_request:
+    branches:
+      - "main"
 
 name: Build Docker images
 
@@ -14,11 +15,10 @@ permissions:
   pull-requests: read
   contents: read
 
-# Untrusted pull request builds must never receive publishing credentials.
 jobs:
   build_dev_image:
     name: Build development image
-    if: github.event_name == 'pull_request' || (github.ref_type == 'branch' && github.ref == 'refs/heads/main')
+    if: github.event_name == 'pull_request' || (github.ref_type == 'branch' && github.ref_name == 'main')
     runs-on: ubuntu-latest
 
     steps:
@@ -33,17 +33,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Full multi-architecture BuildKit build, without Docker Hub, GHCR,
-      # Sentry credentials or image publication. Fail on real Dockerfile errors.
-      - name: Validate amd64 and arm64 images without publishing
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository_owner }}/twake-web
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+
+      # Branch pushes validate the actual multi-architecture Docker build but
+      # MUST NOT publish without explicit release authorization or registry credentials.
+      - name: Build image without publishing
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: "linux/amd64,linux/arm64"
           push: false
-          outputs: type=cacheonly
-          cache-from: type=gha
-          cache-to: type=gha
+          platforms: "linux/amd64,linux/arm64"
+          cache-from: |
+            type=gha
+          cache-to: |
+            type=gha
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   build_release_image:
     name: Build release image
