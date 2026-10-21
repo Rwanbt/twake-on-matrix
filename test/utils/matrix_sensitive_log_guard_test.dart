@@ -159,4 +159,51 @@ void main() {
       true,
     );
   });
+
+  test('quoted JSON QR secrets never reach logs, callbacks or stdout', () {
+    const secret = 'PRIVATE_JSON_QR_TOKEN_MUST_NOT_LEAK';
+    final logger = Logs();
+    final forwarded = <LogEvent>[];
+    final printed = <String>[];
+    logger.level = Level.warning;
+    logger.onLog = forwarded.add;
+    MatrixSensitiveLogGuard.install();
+
+    // JSON serializers and map toString() produce different secret syntax.
+    final titles = <String>[
+      'm.key.verification.start {"secret":"$secret","method":"m.reciprocate.v1"}',
+      'm.key.verification.start {"secret": "$secret with spaces", "from_device":"A"}',
+      "m.key.verification.start {'secret': '$secret'}",
+      'm.key.verification.start {secret: "$secret with spaces"}',
+    ];
+    runZoned(
+      () {
+        for (final title in titles) {
+          logger.w(
+            title,
+            StateError('QR exception $secret'),
+            StackTrace.fromString('QR stack $secret'),
+          );
+        }
+      },
+      zoneSpecification: ZoneSpecification(
+        print: (self, parent, zone, line) => printed.add(line),
+      ),
+    );
+
+    expect(forwarded.length, titles.length);
+    for (final event in forwarded) {
+      expect(event.title, contains('[REDACTED]'));
+      expect(event.toFormattedString(), isNot(contains(secret)));
+    }
+    final history = logger.outputEvents
+        .where((e) => e.title.contains('m.key.verification.start'))
+        .toList();
+    expect(history.length, greaterThanOrEqualTo(titles.length));
+    for (final event in history) {
+      expect(event.toFormattedString(), isNot(contains(secret)));
+    }
+    expect(printed.join('\n'), isNot(contains(secret)));
+    expect(printed.join('\n'), contains('[REDACTED]'));
+  });
 }
