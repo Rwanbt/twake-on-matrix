@@ -1,15 +1,12 @@
 name: Matrix Flutter SDK live session and recovery storage
 
+# Real two-device Matrix trust is security-critical across the app.
+# A prior QR secret-log fix changed shared code, but path filtering omitted
+# this live crypto gate. Execute it for every PR and main candidate.
 on:
   pull_request:
-    paths:
-      - '.github/workflows/matrix-flutter-sdk-live.yml'
-      - 'test/integration_test/matrix_sdk_live_synapse_test.dart'
-      - 'test/data/repository/recovery_key_storage_repository_impl_test.dart'
-      - 'lib/data/repository/recovery_key_storage_repository_impl.dart'
-      - 'lib/utils/matrix_sdk_extensions/twake_client.dart'
-      - 'scripts/integration-server-synapse.sh'
-      - 'integration_test/synapse/data/homeserver.yaml'
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
