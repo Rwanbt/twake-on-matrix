@@ -11,7 +11,14 @@ import 'package:matrix/matrix_api_lite/utils/logs.dart';
 abstract final class MatrixSensitiveLogGuard {
   static LogCallback? _guardedCallback;
 
-  static final RegExp _qrSecret = RegExp(r'(\bsecret\s*:\s*)([^,}\s]+)');
+  // Matrix key-verification diagnostics are emitted as Dart maps and JSON.
+  // Cover unquoted tokens, single/double quoted keys, escaped quotes, and
+  // spaces inside quoted values. Match only a key named "secret", not fields
+  // such as "shared_secret_type", and never echo the original captured value.
+  static final RegExp _qrSecret = RegExp(
+    r'''(\bsecret(?:"|')?\s*:\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,}\s]+)''',
+    caseSensitive: false,
+  );
 
   static String redact(String message) {
     if (!message.contains('m.key.verification.start')) return message;
