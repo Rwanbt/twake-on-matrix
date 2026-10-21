@@ -206,5 +206,4 @@ void main() {
     expect(printed.join('\n'), isNot(contains(secret)));
     expect(printed.join('\n'), contains('[REDACTED]'));
   });
-
 }
