@@ -370,6 +370,40 @@ void main() {
     }, throwsA(isA<Exception>()));
   }, skip: !runLiveSynapse);
 
+  test('revoked real Matrix access token cannot continue syncing', () async {
+    sqfliteFfiInit();
+    if (!vod.isInitialized()) {
+      await vod.init(libraryPath: './vodozemac/debug/');
+    }
+    final temp = await Directory.systemTemp.createTemp('twake-revoked-token-');
+    addTearDown(() => temp.delete(recursive: true));
+    final session = await _registerDisposableUser();
+    final token = session['access_token'] as String;
+    final client = await _openSdkClient(
+      'revoked-device',
+      session,
+      databasePath: path.join(temp.path, 'revoked.sqlite'),
+    );
+    addTearDown(client.dispose);
+    expect((await client.sync(timeout: 0)).nextBatch, isNotEmpty);
+
+    // Actual homeserver revocation, not merely a made-up bad credential.
+    final logout = await http.post(
+      localSynapse.resolve('/_matrix/client/v3/logout'),
+      headers: {'authorization': 'Bearer $token'},
+    );
+    expect(logout.statusCode, 200);
+    final rejected = await http.get(
+      localSynapse.resolve('/_matrix/client/v3/sync?timeout=0'),
+      headers: {'authorization': 'Bearer $token'},
+    );
+    expect(rejected.statusCode, 401);
+    await expectLater(
+      () => client.sync(timeout: 0),
+      throwsA(isA<Exception>()),
+    );
+  }, skip: !runLiveSynapse);
+
   test(
     'real two-device QR trust with Synapse',
     _runRealQrTest,
