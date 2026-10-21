@@ -14,19 +14,27 @@ name: Build Docker images
 permissions:
   pull-requests: read
   contents: read
-  packages: write
 
 jobs:
-  build_dev_image:
-    name: Build development image
+  # Build each architecture on native GitHub runners. The previous combined
+  # amd64+arm64 Buildx job ran Flutter, Rust and Brotli under QEMU for arm64,
+  # consuming hours without producing a CI verdict.
+  build_dev_platform:
+    name: Validate image (${{ matrix.arch }})
     if: github.event_name == 'pull_request' || (github.ref_type == 'branch' && github.ref_name == 'main')
-    runs-on: ubuntu-latest
-    environment: dev
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            platform: linux/amd64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+    runs-on: ${{ matrix.runner }}
 
     steps:
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -45,34 +53,37 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
 
-      # Branch pushes validate the actual multi-architecture Docker build but
-      # MUST NOT publish without explicit release authorization or registry credentials.
-      - name: Build image without publishing
+      - name: Validate full image without publishing
         uses: docker/build-push-action@v6
         with:
           context: .
           push: false
-          platforms: "linux/amd64,linux/arm64"
-          cache-from: |
-            type=gha
-          cache-to: |
-            type=gha
+          outputs: type=cacheonly
+          platforms: ${{ matrix.platform }}
+          cache-from: type=gha,scope=twake-web-${{ matrix.arch }}
+          cache-to: type=gha,scope=twake-web-${{ matrix.arch }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # SENTRY_RELEASE/DIST default to pubspec.yaml values inside the build
-          build-args: |
-            SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }}
-            SENTRY_ORG=${{ secrets.SENTRY_ORG }}
-            SENTRY_DSN=${{ secrets.SENTRY_DSN }}
-            SENTRY_ENVIRONMENT=${{ secrets.SENTRY_ENVIRONMENT }}
-          secrets: |
-            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+
+  # Preserve the existing required check name. Its success requires BOTH
+  # native architecture builds to complete successfully; skips/failures fail.
+  build_dev_image:
+    name: Build development image
+    if: always() && (github.event_name == 'pull_request' || (github.ref_type == 'branch' && github.ref_name == 'main'))
+    needs: build_dev_platform
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require both native builds to pass
+        run: test "${{ needs.build_dev_platform.result }}" = "success"
 
   build_release_image:
     name: Build release image
     if: github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     environment: prod
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Set up QEMU
