@@ -45,3 +45,19 @@ test('Patrol web Synapse runner cannot write checks or pull requests', () => {
   assert.doesNotMatch(testJob, /^\s+(?:checks|pull-requests|contents): write\s*$/m)
   assert.match(testJob, /upload-artifact@/)
 })
+
+test('real two-device Matrix SDK QR and SQLite recovery run on every PR and main', () => {
+  const live = read('matrix-flutter-sdk-live.yml')
+  const triggers = live.split(/^permissions:/m)[0]
+  // This is a security acceptance gate, not an optional path-limited smoke:
+  // the previous QR secret logging fix passed without running this suite.
+  assert.match(triggers, /^  pull_request:\s*$/m)
+  assert.match(triggers, /^  push:\s*$/m)
+  assert.match(triggers, /^    branches: \[main\]\s*$/m)
+  assert.doesNotMatch(triggers, /^\s+paths:\s*$/m)
+  assert.match(live, /permissions:\s*\r?\n  contents: read/)
+  assert.match(live, /scripts\/integration-server-synapse\.sh/)
+  assert.match(live, /--dart-define=TWAKE_LIVE_SYNAPSE=true/)
+  assert.match(live, /matrix_sdk_live_synapse_test\.dart/)
+  assert.doesNotMatch(live, /continue-on-error:\s*true/)
+})
