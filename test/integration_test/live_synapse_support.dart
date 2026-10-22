@@ -119,9 +119,14 @@ Future<void> syncUntil(
   while (DateTime.now().isBefore(deadline)) {
     if (condition()) return;
     for (final client in clients) {
-      await client
-          .oneShotSync(timeout: const Duration(milliseconds: 100))
-          .timeout(const Duration(seconds: 8));
+      try {
+        await client
+            .oneShotSync(timeout: const Duration(milliseconds: 100))
+            .timeout(const Duration(seconds: 8));
+      } catch (_) {
+        // A slow or failing sync must not abort the wait loop: the deadline
+        // of the loop is the only real timeout of this helper.
+      }
       if (condition()) return;
     }
     await Future<void>.delayed(const Duration(milliseconds: 80));

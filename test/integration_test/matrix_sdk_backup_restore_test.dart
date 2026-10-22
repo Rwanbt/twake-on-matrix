@@ -9,6 +9,7 @@ import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/twake_client.dart';
 import 'package:twake_chat/utils/matrix_sensitive_log_guard.dart';
+// ignore: depend_on_referenced_packages
 import 'package:vodozemac/vodozemac.dart' as vod;
 
 import 'live_synapse_support.dart';
@@ -24,7 +25,7 @@ const String disposableAttachment = 'disposable-attachment.bin';
 /// Tells whether the client knows the cross-signing master key.
 bool hasMasterKey(TwakeClient client) {
   final ssss = client.encryption!.ssss;
-  return ssss.getCached(EventTypes.CrossSigningMasterKey) != null;
+  return ssss.getCached(EventTypes.CrossSigningMasterKey).isNotEmpty;
 }
 
 /// Tells whether the client knows the Megolm session of a room.
@@ -253,7 +254,7 @@ void main() {
         'the room on the second device',
       );
       final secondRoom = second.getRoomById(roomId)!;
-      final encrypted = await secondRoom.getEventById(messageId!);
+      final encrypted = await secondRoom.getEventById(messageId);
       expect(encrypted, isNotNull);
       // The Megolm session of the room is known by the sending device.
       final keyManager = first.encryption!.keyManager;
@@ -290,7 +291,7 @@ void main() {
         () => hasRoomKey(second, roomId, sessionId),
         'the room key restored on the second device',
       );
-      final restored = await secondRoom.getEventById(messageId!);
+      final restored = await secondRoom.getEventById(messageId);
       expect(restored, isNotNull);
       expect(
         restored!.type,
@@ -333,7 +334,7 @@ void main() {
         'the room on the third device',
       );
       final thirdRoom = third.getRoomById(roomId)!;
-      final thirdRaw = await thirdRoom.getEventById(messageId!);
+      final thirdRaw = await thirdRoom.getEventById(messageId);
       expect(thirdRaw, isNotNull);
       expect(thirdRaw, isNotNull);
       await syncUntil(
@@ -359,7 +360,7 @@ void main() {
         () => hasRoomKey(third, roomId, sessionId),
         'the room key restored on the third device',
       );
-      final thirdRestored = await thirdRoom.getEventById(messageId!);
+      final thirdRestored = await thirdRoom.getEventById(messageId);
       expect(thirdRestored, isNotNull);
       expect(
         thirdRestored!.type,
