@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:matrix/encryption.dart';
 import 'package:matrix/matrix.dart';
-import 'package:matrix/matrix_api_lite.dart' show BackupAlgorithm;
 import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/twake_client.dart';
@@ -381,11 +380,15 @@ void main() {
       expect(restartedDecrypted.content['body'], disposableMessage);
 
       // ---- Step 10: the first device is revoked ----
-      final revoked = await revokeDevice(
+      final revokeStatus = await revokeDevice(
         secondSession['access_token'] as String,
         first.deviceID!,
       );
-      expect(revoked, isTrue, reason: 'The device revocation must succeed');
+      expect(
+        revokeStatus,
+        200,
+        reason: 'The device revocation must succeed',
+      );
       final firstToken = session['access_token'] as String;
       expect(
         await isSessionAlive(firstToken),

@@ -242,25 +242,37 @@ Future<Map<String, dynamic>> readServerRoomKeyBackup(
 
 /// Revokes the device [deviceId] with the session of [token].
 ///
-/// Returns true when the homeserver accepted the revocation.
-Future<bool> revokeDevice(String token, String deviceId) async {
-  final response = await http.delete(
+/// Returns the status code of the homeserver: 200 when the revocation was
+/// accepted.
+Future<int> revokeDevice(String token, String deviceId) async {
+  final headers = {'authorization': 'Bearer $token'};
+  final delete = await http.delete(
     localSynapse.resolve('/_matrix/client/v3/devices/$deviceId'),
-    headers: {'authorization': 'Bearer $token'},
+    headers: headers,
   );
-  if (response.statusCode == 405) {
-    // Older homeservers only expose the POST variant.
-    final fallback = await http.post(
-      localSynapse.resolve('/_matrix/client/v3/devices/$deviceId'),
-      headers: {
-        'authorization': 'Bearer $token',
-        'content-type': 'application/json',
-      },
-      body: jsonEncode({'device_id': deviceId}),
-    );
-    return fallback.statusCode == 200;
-  }
-  return response.statusCode == 200;
+  if (delete.statusCode == 200) return delete.statusCode;
+  // Older homeservers only expose the POST variant.
+  final post = await http.post(
+    localSynapse.resolve('/_matrix/client/v3/devices/$deviceId'),
+    headers: {
+      ...headers,
+      'content-type': 'application/json',
+    },
+    body: jsonEncode({'device_id': deviceId}),
+  );
+  if (post.statusCode == 200) return post.statusCode;
+  // Bulk variant of the specification.
+  final devices = <String>[deviceId];
+  final bulk = await http.post(
+    localSynapse.resolve('/_matrix/client/v3/delete_devices'),
+    headers: {
+      ...headers,
+      'content-type': 'application/json',
+    },
+    body: jsonEncode({'devices': devices}),
+  );
+  if (bulk.statusCode == 200) return bulk.statusCode;
+  return delete.statusCode;
 }
 
 /// Tells whether the session of [token] is still accepted by the homeserver.
