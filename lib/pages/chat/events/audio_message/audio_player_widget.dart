@@ -419,7 +419,6 @@ class AudioPlayerState extends State<AudioPlayerWidget>
                 ],
                 Text(
                   DateFormat("HH:mm").format(widget.event.originServerTs),
-                  textScaler: const TextScaler.linear(1.0),
                   style: Theme.of(context).textTheme.bodySmall?.merge(
                     TextStyle(
                       color: LinagoraRefColors.material().tertiary[30],
