@@ -23,12 +23,12 @@ jobs:
 
     steps:
       - name: Checkout gh-pages branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: gh-pages
 
       - name: Checkout main repository (for PR check)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           path: main-repo
 

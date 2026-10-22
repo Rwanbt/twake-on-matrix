@@ -48,7 +48,7 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       # Patrol builds a universal APK and compiles the Rust FFI targets. The
       # standard runner only has ~14 GB, so remove toolchains this job never
@@ -67,13 +67,13 @@ jobs:
           df -h
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: "temurin"
 
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
@@ -87,13 +87,13 @@ jobs:
           yes | sdkmanager --licenses || echo "Warning: License acceptance failed"
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
 
       - name: Install Rust targets for Android
         run: |
           rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
 
-      - uses: webfactory/ssh-agent@v0.9.0
+      - uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
@@ -143,7 +143,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Run Patrol on x86_64 emulator
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         env:
           # Pass the dispatch input through the environment instead of
           # interpolating it into the shell script: `${{ }}` substitution is
@@ -227,7 +227,7 @@ jobs:
               integration_test/tests/setting/settings_recovery_key_test.dart
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       # Patrol builds a universal APK and compiles the Rust FFI targets. The
       # standard runner only has ~14 GB, so remove toolchains this job never
@@ -246,13 +246,13 @@ jobs:
           df -h
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: "temurin"
 
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
@@ -266,13 +266,13 @@ jobs:
           yes | sdkmanager --licenses || echo "Warning: License acceptance failed"
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
 
       - name: Install Rust targets for Android
         run: |
           rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
 
-      - uses: webfactory/ssh-agent@v0.9.0
+      - uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
@@ -322,7 +322,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Run Patrol shard on x86_64 emulator
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
           api-level: 34
           target: google_apis
@@ -354,7 +354,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Free up disk space
         run: |
@@ -370,13 +370,13 @@ jobs:
           df -h
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: "temurin"
 
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
@@ -390,13 +390,13 @@ jobs:
           yes | sdkmanager --licenses || echo "Warning: License acceptance failed"
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
 
       - name: Install Rust targets for Android
         run: |
           rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
 
-      - uses: webfactory/ssh-agent@v0.9.0
+      - uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
@@ -434,7 +434,7 @@ jobs:
             --target integration_test/tests/chat/perf_test.dart
 
       - name: Upload APKs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: perf-apks-${{ github.run_id }}
           retention-days: 1
@@ -485,14 +485,14 @@ jobs:
           fi
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
         with:
           project_id: ${{ secrets.GOOGLE_CLOUD_PROJECT_ID }}
           workload_identity_provider: ${{ secrets.GOOGLE_CLOUD_WORKLOAD_IDENTITY_PROVIDER_ID }}
           service_account: ${{ secrets.GOOGLE_CLOUD_SERVICE_ACCOUNT }}
 
       - name: Download APKs
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: perf-apks-${{ github.run_id }}
           path: apks/
@@ -531,7 +531,7 @@ jobs:
 
       - name: Upload physical run logcat
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: perf-physical-logcat-${{ github.run_id }}-run${{ matrix.run }}
           retention-days: 7
@@ -560,10 +560,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Download physical run logcats
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           pattern: perf-physical-logcat-${{ github.run_id }}-run*
           path: perf_logcats/physical/
@@ -584,7 +584,7 @@ jobs:
           cat perf_median_physical.json
 
       - name: Upload results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: perf-results-${{ github.run_id }}
           retention-days: 90
@@ -616,18 +616,18 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
 
       - name: Download consolidated performance results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: perf-results-${{ github.run_id }}
           path: perf-results/
 
       - name: Checkout existing GitHub Pages history
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           ref: gh-pages
@@ -676,7 +676,7 @@ jobs:
             --summary-file performance-summary.md
 
       - name: Deploy performance dashboard
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: performance-site

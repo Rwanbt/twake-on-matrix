@@ -50,19 +50,19 @@ jobs:
           fi
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed
         with:
           project_id: ${{ secrets.GOOGLE_CLOUD_PROJECT_ID }}
           workload_identity_provider: ${{ secrets.GOOGLE_CLOUD_WORKLOAD_IDENTITY_PROVIDER_ID }}
           service_account: ${{ secrets.GOOGLE_CLOUD_SERVICE_ACCOUNT }}
 
       - name: Checkout existing GitHub Pages
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: gh-pages
           path: existing-pages
@@ -111,7 +111,7 @@ jobs:
             "${ARGS[@]}"
 
       - name: Upload rebuilt history
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: perf-backfill-data-${{ github.run_id }}
           retention-days: 30
@@ -119,7 +119,7 @@ jobs:
 
       - name: Deploy performance dashboard
         if: ${{ inputs.deploy }}
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: performance-site
