@@ -370,38 +370,42 @@ void main() {
     }, throwsA(isA<Exception>()));
   }, skip: !runLiveSynapse);
 
-  test('real Synapse revokes a previously working SDK session token', () async {
-    sqfliteFfiInit();
-    if (!vod.isInitialized()) {
-      await vod.init(libraryPath: './vodozemac/debug/');
-    }
-    final temp = await Directory.systemTemp.createTemp('twake-revoked-token-');
-    addTearDown(() => temp.delete(recursive: true));
-    final session = await _registerDisposableUser();
-    final token = session['access_token'] as String;
-    final client = await _openSdkClient(
-      'revoked-device',
-      session,
-      databasePath: path.join(temp.path, 'revoked.sqlite'),
-    );
-    addTearDown(client.dispose);
-    expect((await client.sync(timeout: 0)).nextBatch, isNotEmpty);
-
-    // Actual homeserver revocation, not merely a made-up bad credential.
-    final logout = await http.post(
-      localSynapse.resolve('/_matrix/client/v3/logout'),
-      headers: {'authorization': 'Bearer $token'},
-    );
-    expect(logout.statusCode, 200);
-    final rejected = await http.get(
-      localSynapse.resolve('/_matrix/client/v3/sync?timeout=0'),
-      headers: {'authorization': 'Bearer $token'},
-    );
-    expect(rejected.statusCode, 401);
-    // The server refuses the exact token previously used by TwakeClient.
-    // Do not start another SDK sync here: its background sync can trigger
-    // automatic logout/database disposal while the test tears down SQLite.
-  },
+  test(
+    'real Synapse revokes a previously working SDK session token',
+    () async {
+      sqfliteFfiInit();
+      if (!vod.isInitialized()) {
+        await vod.init(libraryPath: './vodozemac/debug/');
+      }
+      final temp = await Directory.systemTemp.createTemp(
+        'twake-revoked-token-',
+      );
+      addTearDown(() => temp.delete(recursive: true));
+      final session = await _registerDisposableUser();
+      final token = session['access_token'] as String;
+      final client = await _openSdkClient(
+        'revoked-device',
+        session,
+        databasePath: path.join(temp.path, 'revoked.sqlite'),
+      );
+      addTearDown(client.dispose);
+      expect((await client.sync(timeout: 0)).nextBatch, isNotEmpty);
+  
+      // Actual homeserver revocation, not merely a made-up bad credential.
+      final logout = await http.post(
+        localSynapse.resolve('/_matrix/client/v3/logout'),
+        headers: {'authorization': 'Bearer $token'},
+      );
+      expect(logout.statusCode, 200);
+      final rejected = await http.get(
+        localSynapse.resolve('/_matrix/client/v3/sync?timeout=0'),
+        headers: {'authorization': 'Bearer $token'},
+      );
+      expect(rejected.statusCode, 401);
+      // The server refuses the exact token previously used by TwakeClient.
+      // Do not start another SDK sync here: its background sync can trigger
+      // automatic logout/database disposal while the test tears down SQLite.
+    },
     skip: !runLiveSynapse,
   );
 
