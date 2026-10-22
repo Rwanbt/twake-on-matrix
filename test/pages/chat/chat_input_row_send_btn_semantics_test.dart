@@ -38,10 +38,11 @@ void main() {
     );
 
     expect(find.byTooltip('Voice message'), findsOneWidget);
-    expect(
-      tester.getSemantics(find.byTooltip('Voice message')),
-      matchesSemantics(label: 'Voice message', hasTapAction: true),
+    final recordSemantics = tester.getSemantics(
+      find.byTooltip('Voice message'),
     );
+    expect(recordSemantics.getSemanticsData().tooltip, 'Voice message');
+    expect(recordSemantics.hasAction(SemanticsAction.tap), isTrue);
     expect(
       tester.getSize(find.byTooltip('Voice message')),
       const Size(44, 44),
@@ -52,14 +53,11 @@ void main() {
 
     expect(find.byTooltip('Delete'), findsOneWidget);
     expect(find.byTooltip('Send audio'), findsOneWidget);
-    expect(
-      tester.getSemantics(find.byTooltip('Delete')),
-      matchesSemantics(label: 'Delete', hasTapAction: true),
-    );
-    expect(
-      tester.getSemantics(find.byTooltip('Send audio')),
-      matchesSemantics(label: 'Send audio', hasTapAction: true),
-    );
+    for (final label in ['Delete', 'Send audio']) {
+      final semanticsNode = tester.getSemantics(find.byTooltip(label));
+      expect(semanticsNode.getSemanticsData().tooltip, label);
+      expect(semanticsNode.hasAction(SemanticsAction.tap), isTrue);
+    }
     for (final label in ['Delete', 'Send audio']) {
       final size = tester.getSize(find.byTooltip(label));
       expect(size.width, greaterThanOrEqualTo(44));
