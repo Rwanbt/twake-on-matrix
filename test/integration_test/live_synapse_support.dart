@@ -80,7 +80,6 @@ Future<TwakeClient> openSdkClient(
     name,
     database: database,
     logLevel: Level.warning,
-    httpClient: _LoggingHttpClient(),
     verificationMethods: {
       KeyVerificationMethod.numbers,
       KeyVerificationMethod.qrShow,
