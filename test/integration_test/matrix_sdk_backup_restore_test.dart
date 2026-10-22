@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:matrix/encryption.dart';
 import 'package:matrix/matrix.dart';
+import 'package:matrix/matrix_api_lite.dart' show BackupAlgorithm;
 import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/twake_client.dart';
@@ -282,15 +283,20 @@ void main() {
       expect(decrypted.content['body'], disposableMessage);
 
       // ---- Step 4: the room key is uploaded to the server side backup ----
-      await first.encryption!.keyManager.uploadInboundGroupSessions();
-      final backup = await readServerRoomKeyBackup(
-        session['access_token'] as String,
-        roomId,
+      await first.oneShotSync(timeout: const Duration(milliseconds: 100));
+      await first.oneShotSync(timeout: const Duration(milliseconds: 100));
+      final keyManager = first.encryption!.keyManager;
+      await keyManager.uploadInboundGroupSessions();
+      final backupInfo = await keyManager.getRoomKeysBackupInfo(false);
+      expect(
+        backupInfo.version,
+        isNotNull,
+        reason: 'The homeserver must hold a room key backup for the account',
       );
       expect(
-        backup,
-        isNotEmpty,
-        reason: 'The homeserver must hold the room key of the account',
+        backupInfo.algorithm,
+        BackupAlgorithm.mMegolmBackupV1Curve25519AesSha2,
+        reason: 'The room key backup must use the Megolm backup algorithm',
       );
 
       // ---- Step 8: another device restores the room key from the backup ----
@@ -334,8 +340,9 @@ void main() {
       await third.encryption!.keyManager.loadAllKeysFromRoom(roomId);
       final thirdRestored = await thirdRoom.getEventById(messageId!);
       expect(thirdRestored, isNotNull);
-      final thirdDecrypted =
-          await third.encryption!.decryptRoomEvent(thirdRestored!);
+      final thirdDecrypted = await third.encryption!.decryptRoomEvent(
+        thirdRestored!,
+      );
       expect(
         thirdDecrypted.type,
         EventTypes.Message,
@@ -359,11 +366,13 @@ void main() {
         isTrue,
         reason: 'The recovered trust must survive the SQLite reopen',
       );
-      final restartedRaw =
-          await restarted.getRoomById(roomId)!.getEventById(messageId!);
+      final restartedRaw = await restarted
+          .getRoomById(roomId)!
+          .getEventById(messageId!);
       expect(restartedRaw, isNotNull);
-      final restartedDecrypted =
-          await restarted.encryption!.decryptRoomEvent(restartedRaw!);
+      final restartedDecrypted = await restarted.encryption!.decryptRoomEvent(
+        restartedRaw!,
+      );
       expect(
         restartedDecrypted.type,
         EventTypes.Message,
