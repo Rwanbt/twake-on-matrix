@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:twake_chat/generated/l10n/app_localizations.dart';
 import 'package:twake_chat/pages/chat/chat_input_row_send_btn.dart';
@@ -38,15 +39,11 @@ void main() {
     );
 
     expect(find.byTooltip('Voice message'), findsOneWidget);
-    final recordSemantics = tester.getSemantics(
-      find.byTooltip('Voice message'),
-    );
-    expect(recordSemantics.getSemanticsData().tooltip, 'Voice message');
-    expect(recordSemantics.hasAction(SemanticsAction.tap), isTrue);
-    expect(
-      tester.getSize(find.byTooltip('Voice message')),
-      const Size(44, 44),
-    );
+    final recordData =
+        tester.getSemantics(find.byTooltip('Voice message')).getSemanticsData();
+    expect(recordData.tooltip, 'Voice message');
+    expect(recordData.actions & (1 << SemanticsAction.tap.index), isNot(0));
+    expect(tester.getSize(find.byTooltip('Voice message')), const Size(44, 44));
 
     recordingState.value = AudioRecordState.recording;
     await tester.pump();
@@ -54,9 +51,10 @@ void main() {
     expect(find.byTooltip('Delete'), findsOneWidget);
     expect(find.byTooltip('Send audio'), findsOneWidget);
     for (final label in ['Delete', 'Send audio']) {
-      final semanticsNode = tester.getSemantics(find.byTooltip(label));
-      expect(semanticsNode.getSemanticsData().tooltip, label);
-      expect(semanticsNode.hasAction(SemanticsAction.tap), isTrue);
+      final data =
+          tester.getSemantics(find.byTooltip(label)).getSemanticsData();
+      expect(data.tooltip, label);
+      expect(data.actions & (1 << SemanticsAction.tap.index), isNot(0));
     }
     for (final label in ['Delete', 'Send audio']) {
       final size = tester.getSize(find.byTooltip(label));
