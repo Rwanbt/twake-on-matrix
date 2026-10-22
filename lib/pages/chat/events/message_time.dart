@@ -63,7 +63,6 @@ class MessageTime extends StatelessWidget {
           if (event.hasAggregatedEvents(timeline, RelationshipTypes.edit))
             Text(
               '${L10n.of(context)!.edited} ',
-              textScaler: const TextScaler.linear(1.0),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: timelineOverlayMessage
                     ? Colors.white
@@ -74,7 +73,6 @@ class MessageTime extends StatelessWidget {
             DateFormat(
               "HH:mm",
             ).format(event.getDisplayEvent(timeline).originServerTs),
-            textScaler: const TextScaler.linear(1.0),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: timelineOverlayMessage
                   ? Colors.white
