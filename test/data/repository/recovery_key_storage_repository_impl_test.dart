@@ -56,11 +56,11 @@ void main() {
       const repository = RecoveryKeyStorageRepositoryImpl(storage);
       const alice = '@alice:127.0.0.1';
       const bob = '@bob:127.0.0.1';
-  
+
       await repository.write(userId: alice, recoveryKey: 'alice-only');
       await repository.write(userId: bob, recoveryKey: 'bob-only');
       await repository.delete(userId: alice);
-  
+
       const reopened = RecoveryKeyStorageRepositoryImpl(storage);
       expect(await reopened.read(userId: alice), isNull);
       expect(await reopened.read(userId: bob), 'bob-only');
