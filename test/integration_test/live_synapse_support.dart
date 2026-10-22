@@ -270,29 +270,6 @@ Future<int> revokeDevice(String token, String deviceId) async {
   return delete.statusCode;
 }
 
-/// An [http.Client] wrapper that logs every request and response, so the
-/// real homeserver error behind `Upload key failed` can be captured.
-class _LoggingHttpClient extends http.BaseClient {
-  final http.Client _inner = http.Client();
-
-  @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    final response = await _inner.send(request);
-    final bodyBytes = await response.stream.toBytes();
-    final body = utf8.decode(bodyBytes, allowMalformed: true);
-    Logs().w('[HTTP] ${request.method} ${request.url} -> ${response.statusCode}: $body');
-    return http.StreamedResponse(
-      Stream.value(bodyBytes),
-      response.statusCode,
-      contentLength: response.contentLength,
-      request: response.request,
-      headers: response.headers,
-      isRedirect: response.isRedirect,
-      persistentConnection: response.persistentConnection,
-      reasonPhrase: response.reasonPhrase,
-    );
-  }
-}
 
 /// Tells whether the session of [token] is still accepted by the homeserver.
 Future<bool> isSessionAlive(String token) async {
