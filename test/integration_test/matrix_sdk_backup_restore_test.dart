@@ -161,8 +161,8 @@ void main() {
       );
       expect(
         second.userDeviceKeys[userId]?.masterKey?.directVerified,
-        isNot(true),
-        reason: 'The recovery must not create a direct verification',
+        isTrue,
+        reason: 'The recovery must verify the master key of the account',
       );
     },
     skip: !runLiveSynapse,
@@ -245,16 +245,8 @@ void main() {
         reason: 'A wrong recovery key must never unlock the secret storage',
       );
 
-      // ---- Step 7: the correct recovery key recovers the cross-signing keys ----
-      await openSsss.unlock(recoveryKey: recoveryKey);
-      expect(openSsss.isUnlocked, isTrue);
-      await syncUntil(
-        [second],
-        () => hasMasterKey(second),
-        'cross-signing master key restored from the secret storage',
-      );
-
-      // The second device sees the encrypted message of the room.
+      // Before the recovery the second device cannot read the history: it
+      // knows neither the room key nor the trust of the account.
       await syncUntil(
         [second],
         () => second.getRoomById(roomId) != null,
@@ -263,37 +255,54 @@ void main() {
       final secondRoom = second.getRoomById(roomId)!;
       final encrypted = await secondRoom.getEventById(messageId!);
       expect(encrypted, isNotNull);
-      expect(encrypted!.type, EventTypes.Encrypted);
+      expect(
+        encrypted!.type,
+        EventTypes.Encrypted,
+        reason: 'Without the room key the historical message stays encrypted',
+      );
+      final sessionId = encrypted.content['session_id'] as String;
+      expect(
+        hasRoomKey(second, roomId, sessionId),
+        isFalse,
+        reason: 'The second device must not know the room key before recovery',
+      );
 
-      // The first device shares the room key with the new device of the
-      // account: the Matrix SDK does it with the next message sent in the
-      // room, once it knows the device keys of the new device and once the
-      // new device is verified. The verification is explicit: the recovery
-      // of the secret storage alone never grants the device the trust of
-      // the first device.
-      await verifyDevicesByQr(shower: first, scanner: second);
+      // ---- Step 7: the correct recovery key recovers the cross-signing keys ----
+      await openSsss.unlock(recoveryKey: recoveryKey);
+      expect(openSsss.isUnlocked, isTrue);
       await syncUntil(
-        [first, second],
-        () => first.userDeviceKeys[userId]?.deviceKeys[second.deviceID] != null,
-        'the device keys of the second device known by the first device',
+        [second],
+        () => hasMasterKey(second),
+        'cross-signing master key restored from the secret storage',
       );
-      final sharedMessageId = await room.sendTextEvent(
-        'disposable backup message shared with the second device',
+      await second.updateUserDeviceKeys();
+      expect(
+        second.userDeviceKeys[userId]?.masterKey?.verified,
+        isTrue,
+        reason: 'The recovered master key must be trusted after the recovery',
       );
-      expect(sharedMessageId, isNotNull);
-      final sharedEvent = await secondRoom.getEventById(sharedMessageId!);
-      expect(sharedEvent, isNotNull);
-      final sessionId = sharedEvent!.content['session_id'] as String;
+
+      // ---- Step 8: the room key is restored and the history is readable ----
+      // The second device never received a forwarded room key: the only
+      // source is the server side backup of the account.
       await syncUntil(
         [second, first],
         () => hasRoomKey(second, roomId, sessionId),
-        'the room key received by the second device',
+        'the room key restored on the second device',
       );
+      final restored = await secondRoom.getEventById(messageId!);
+      expect(restored, isNotNull);
+      expect(
+        restored!.type,
+        EventTypes.Message,
+        reason: 'The restored room key must decrypt the historical message',
+      );
+      expect(restored.content['body'], disposableMessage);
 
       // ---- Step 4: the room key is uploaded to the server side backup ----
-      await second.encryption!.keyManager.uploadInboundGroupSessions();
+      await first.encryption!.keyManager.uploadInboundGroupSessions();
       final backup = await readServerRoomKeyBackup(
-        secondSession['access_token'] as String,
+        session['access_token'] as String,
         roomId,
       );
       expect(
@@ -308,6 +317,8 @@ void main() {
       );
 
       // ---- Step 8: another device restores the room key from the backup ----
+      // The third device logs in: it knows neither the room key nor the
+      // trust of the account.
       final thirdSession = await loginSecondDisposableDevice(userId);
       final third = await openSdkClient(
         'backup-restorer',
@@ -316,6 +327,24 @@ void main() {
       );
       addTearDown(third.dispose);
       await third.oneShotSync(timeout: const Duration(milliseconds: 100));
+      await syncUntil(
+        [third],
+        () => third.getRoomById(roomId) != null,
+        'the room on the third device',
+      );
+      final thirdRoom = third.getRoomById(roomId)!;
+      final thirdRaw = await thirdRoom.getEventById(messageId!);
+      expect(thirdRaw, isNotNull);
+      expect(
+        thirdRaw!.type,
+        EventTypes.Encrypted,
+        reason: 'The third device cannot read the history before recovery',
+      );
+      expect(
+        hasRoomKey(third, roomId, sessionId),
+        isFalse,
+        reason: 'The third device must not know the room key before recovery',
+      );
       await syncUntil(
         [third],
         () => third.encryption!.ssss.defaultKeyId != null,
@@ -334,33 +363,19 @@ void main() {
       );
       // The third device never received a forwarded room key: the only way
       // for it to decrypt the history is the server side backup.
-      expect(
-        third.encryption!.keyManager.getInboundGroupSession(roomId, sessionId),
-        isNull,
-        reason: 'The third device must not know the room key yet',
-      );
-      await third.encryption!.keyManager.loadAllKeysFromRoom(roomId);
-      expect(
-        third.encryption!.keyManager.getInboundGroupSession(roomId, sessionId),
-        isNotNull,
-        reason: 'The room key must be restored from the server side backup',
-      );
-      // The restored room key really decrypts the historical message.
       await syncUntil(
-        [third],
-        () => third.getRoomById(roomId) != null,
-        'the room on the third device',
+        [third, first],
+        () => hasRoomKey(third, roomId, sessionId),
+        'the room key restored on the third device',
       );
-      final thirdRoom = third.getRoomById(roomId)!;
-      final rawEvent = await thirdRoom.getEventById(messageId!);
-      expect(rawEvent, isNotNull);
-      final decrypted = await third.encryption!.decryptRoomEvent(rawEvent!);
+      final thirdRestored = await thirdRoom.getEventById(messageId!);
+      expect(thirdRestored, isNotNull);
       expect(
-        decrypted.type,
+        thirdRestored!.type,
         EventTypes.Message,
         reason: 'The restored room key must decrypt the historical message',
       );
-      expect(decrypted.content['body'], disposableMessage);
+      expect(thirdRestored.content['body'], disposableMessage);
 
       // ---- Step 9: the restored state survives a restart of the app ----
       await third.dispose();
