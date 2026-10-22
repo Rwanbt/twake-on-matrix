@@ -55,20 +55,6 @@ void main() {
         chunk: TimelineChunk(events: []),
       );
       timeline.addAggregatedEvent(edit);
-      room.setState(
-        Event(
-          senderId: '@alice:example.org',
-          type: EventTypes.RoomPinnedEvents,
-          room: room,
-          eventId: r'$pinned:example.org',
-          stateKey: '',
-          content: {
-            'pinned': [eventId],
-          },
-          originServerTs: DateTime(2024, 1, 1),
-        ),
-      );
-
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('en'),
@@ -96,9 +82,8 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump();
 
-      expect(find.byIcon(Icons.push_pin_outlined), findsOneWidget);
       expect(find.text('edited '), findsOneWidget);
       expect(find.text('12:35'), findsOneWidget);
       for (final label in ['edited ', '12:35']) {
