@@ -24,8 +24,8 @@ const String disposableAttachment = 'disposable-attachment.bin';
 
 /// Tells whether the client knows the cross-signing master key.
 bool hasMasterKey(TwakeClient client) {
-  final ssss = client.encryption!.ssss;
-  return ssss.getCached(EventTypes.CrossSigningMasterKey).isNotEmpty;
+  final keys = client.userDeviceKeys[client.userID];
+  return keys?.masterKey?.verified == true;
 }
 
 /// Tells whether the client knows the Megolm session of a room.
@@ -254,7 +254,7 @@ void main() {
         'the room on the second device',
       );
       final secondRoom = second.getRoomById(roomId)!;
-      final encrypted = await secondRoom.getEventById(messageId);
+      final encrypted = await secondRoom.getEventById(messageId!);
       expect(encrypted, isNotNull);
       // The Megolm session of the room is known by the sending device.
       final keyManager = first.encryption!.keyManager;
@@ -291,7 +291,7 @@ void main() {
         () => hasRoomKey(second, roomId, sessionId),
         'the room key restored on the second device',
       );
-      final restored = await secondRoom.getEventById(messageId);
+      final restored = await secondRoom.getEventById(messageId!);
       expect(restored, isNotNull);
       expect(
         restored!.type,
@@ -334,7 +334,7 @@ void main() {
         'the room on the third device',
       );
       final thirdRoom = third.getRoomById(roomId)!;
-      final thirdRaw = await thirdRoom.getEventById(messageId);
+      final thirdRaw = await thirdRoom.getEventById(messageId!);
       expect(thirdRaw, isNotNull);
       expect(thirdRaw, isNotNull);
       await syncUntil(
@@ -360,7 +360,7 @@ void main() {
         () => hasRoomKey(third, roomId, sessionId),
         'the room key restored on the third device',
       );
-      final thirdRestored = await thirdRoom.getEventById(messageId);
+      final thirdRestored = await thirdRoom.getEventById(messageId!);
       expect(thirdRestored, isNotNull);
       expect(
         thirdRestored!.type,
