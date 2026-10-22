@@ -160,9 +160,7 @@ void main() {
         await vod.init(libraryPath: './vodozemac/debug/');
       }
       sqfliteFfiInit();
-      final temp = await Directory.systemTemp.createTemp(
-        'twake-corrupted-db-',
-      );
+      final temp = await Directory.systemTemp.createTemp('twake-corrupted-db-');
       addTearDown(() => temp.delete(recursive: true));
 
       final session = await registerDisposableUser();
@@ -192,11 +190,7 @@ void main() {
       // Reopening must fail: a corrupted storage must never come back as a
       // trusted device.
       await expectLater(
-        openSdkClient(
-          'corrupted-source',
-          session,
-          databasePath: databasePath,
-        ),
+        openSdkClient('corrupted-source', session, databasePath: databasePath),
         throwsA(anything),
         reason: 'A corrupted database must fail closed',
       );
