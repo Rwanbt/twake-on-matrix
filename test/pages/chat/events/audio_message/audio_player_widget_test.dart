@@ -35,6 +35,10 @@ class _FakeMatrixState extends Fake implements MatrixState {
   @override
   ValueNotifier<Event?> get voiceMessageEvent => _voiceMessageEvent;
 
+  @override
+  String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) =>
+      '_FakeMatrixState';
+
   void dispose() {
     _currentAudioStatus.dispose();
     _voiceMessageEvent.dispose();
@@ -42,63 +46,63 @@ class _FakeMatrixState extends Fake implements MatrixState {
 }
 
 void main() {
-  testWidgets('audio filename and duration respect the ambient 2x text scaler',
-      (
-    tester,
-  ) async {
-    final client = Client(
-      'audio-player-test',
-      httpClient: FakeMatrixApi(),
-      database: MockDatabase(),
-    );
-    final room = Room(
-      client: client,
-      id: '!audio-player:example.org',
-      membership: Membership.join,
-    );
-    final event = Event(
-      senderId: '@alice:example.org',
-      type: EventTypes.Message,
-      room: room,
-      eventId: r'$audio:example.org',
-      content: {
-        'body': 'voice-note.ogg',
-        'msgtype': 'm.audio',
-        'org.matrix.msc1767.audio': {'duration': 5000},
-      },
-      originServerTs: DateTime(2024, 1, 1, 12, 34),
-    );
-    final timeline = Timeline(
-      room: room,
-      chunk: TimelineChunk(events: [event]),
-    );
-    final matrixState = _FakeMatrixState();
-    addTearDown(matrixState.dispose);
+  testWidgets(
+    'audio filename and duration respect the ambient 2x text scaler',
+    (tester) async {
+      final client = Client(
+        'audio-player-test',
+        httpClient: FakeMatrixApi(),
+        database: MockDatabase(),
+      );
+      final room = Room(
+        client: client,
+        id: '!audio-player:example.org',
+        membership: Membership.join,
+      );
+      final event = Event(
+        senderId: '@alice:example.org',
+        type: EventTypes.Message,
+        room: room,
+        eventId: r'$audio:example.org',
+        content: {
+          'body': 'voice-note.ogg',
+          'msgtype': 'm.audio',
+          'org.matrix.msc1767.audio': {'duration': 5000},
+        },
+        originServerTs: DateTime(2024, 1, 1, 12, 34),
+      );
+      final timeline = Timeline(
+        room: room,
+        chunk: TimelineChunk(events: [event]),
+      );
+      final matrixState = _FakeMatrixState();
+      addTearDown(matrixState.dispose);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        builder: (context, child) => MediaQuery(
-          data: const MediaQueryData(textScaler: TextScaler.linear(2)),
-          child: child!,
-        ),
-        home: Provider<MatrixState>.value(
-          value: matrixState,
-          child: Scaffold(body: AudioPlayerWidget(event, timeline: timeline)),
-        ),
-      ),
-    );
-    await tester.pump();
-
-    for (final label in ['voice-note.ogg', '00:05']) {
-      expect(find.text(label), findsOneWidget);
-      final paragraph = tester.renderObject<RenderParagraph>(
-        find.descendant(
-          of: find.text(label),
-          matching: find.byType(RichText),
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: Provider<MatrixState>.value(
+            value: matrixState,
+            child: Scaffold(body: AudioPlayerWidget(event, timeline: timeline)),
+          ),
         ),
       );
-      expect(paragraph.textScaler.scale(10), 20);
-    }
-    expect(tester.takeException(), isNull);
-  });
+      await tester.pump();
+
+      for (final label in ['voice-note.ogg', '00:05']) {
+        expect(find.text(label), findsOneWidget);
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(
+            of: find.text(label),
+            matching: find.byType(RichText),
+          ),
+        );
+        expect(paragraph.textScaler.scale(10), 20);
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
