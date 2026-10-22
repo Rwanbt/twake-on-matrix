@@ -60,7 +60,7 @@ void main() {
       await room!.enableEncryption();
 
       // A malformed encrypted event, injected straight in the room.
-      final malformed = await http.post(
+      final malformed = await http.put(
         localSynapse.resolve(
           '/_matrix/client/v3/rooms/$roomId/send/m.room.encrypted/$bogusTransactionId',
         ),
