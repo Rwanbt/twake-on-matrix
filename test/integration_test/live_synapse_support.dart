@@ -194,7 +194,7 @@ Future<void> verifyDevicesByQr({
     'ready + qr negotiation',
   );
   final authenticQr = Uint8List.fromList(showing.qrCode!.qrDataRawBytes);
-  await scanner.continueVerification(
+  await scanning.continueVerification(
     EventTypes.Reciprocate,
     qrDataRawBytes: authenticQr,
   );
