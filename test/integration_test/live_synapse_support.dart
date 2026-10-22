@@ -254,10 +254,7 @@ Future<int> revokeDevice(String token, String deviceId) async {
   // Older homeservers only expose the POST variant.
   final post = await http.post(
     localSynapse.resolve('/_matrix/client/v3/devices/$deviceId'),
-    headers: {
-      ...headers,
-      'content-type': 'application/json',
-    },
+    headers: {...headers, 'content-type': 'application/json'},
     body: jsonEncode({'device_id': deviceId}),
   );
   if (post.statusCode == 200) return post.statusCode;
@@ -265,10 +262,7 @@ Future<int> revokeDevice(String token, String deviceId) async {
   final devices = <String>[deviceId];
   final bulk = await http.post(
     localSynapse.resolve('/_matrix/client/v3/delete_devices'),
-    headers: {
-      ...headers,
-      'content-type': 'application/json',
-    },
+    headers: {...headers, 'content-type': 'application/json'},
     body: jsonEncode({'devices': devices}),
   );
   if (bulk.statusCode == 200) return bulk.statusCode;
