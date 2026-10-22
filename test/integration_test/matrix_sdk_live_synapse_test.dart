@@ -390,7 +390,7 @@ void main() {
       );
       addTearDown(client.dispose);
       expect((await client.sync(timeout: 0)).nextBatch, isNotEmpty);
-  
+
       // Actual homeserver revocation, not merely a made-up bad credential.
       final logout = await http.post(
         localSynapse.resolve('/_matrix/client/v3/logout'),
