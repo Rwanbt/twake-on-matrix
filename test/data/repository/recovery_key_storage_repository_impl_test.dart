@@ -69,5 +69,4 @@ void main() {
       expect(await reopened.read(userId: bob), 'bob-only');
     },
   );
-
 }
