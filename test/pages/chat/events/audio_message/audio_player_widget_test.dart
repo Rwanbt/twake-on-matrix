@@ -39,6 +39,7 @@ class _FakeMatrixState extends Fake implements MatrixState {
   String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) =>
       '_FakeMatrixState';
 
+  @override
   void dispose() {
     _currentAudioStatus.dispose();
     _voiceMessageEvent.dispose();
