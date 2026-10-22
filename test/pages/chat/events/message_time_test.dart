@@ -19,7 +19,11 @@ void main() {
   testWidgets(
     'MessageTime timestamp and edited label use the ambient 2x text scaler',
     (tester) async {
-      final client = await getClient();
+      final client = Client(
+        'message-time-test',
+        httpClient: FakeMatrixApi(),
+        database: MockDatabase(),
+      );
       final room = Room(
         client: client,
         id: '!message-time:example.org',
