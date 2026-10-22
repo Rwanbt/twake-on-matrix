@@ -1,0 +1,63 @@
+const { test } = require('node:test')
+const assert = require('node:assert/strict')
+const { readFileSync } = require('node:fs')
+const { join } = require('node:path')
+
+const read = name => readFileSync(
+  join(__dirname, '..', '.github', 'workflows', name),
+  'utf8'
+)
+const tests = read('tests.yaml')
+
+test('untrusted Chat analysis has no GitHub write token, SSH private keys or persistent checkout credentials', () => {
+  assert.match(tests, /^permissions:\s*\r?\n  contents: read\s*$/m)
+  assert.doesNotMatch(tests, /\b(contents|actions|checks|pull-requests): write\b/)
+  assert.doesNotMatch(tests, /\bsecrets\.SSH_KEY\b|webfactory\/ssh-agent/)
+  assert.doesNotMatch(tests, /\bcontinue-on-error: true\b/)
+  const checkouts = [...tests.matchAll(/^\s*-?\s*uses: actions\/checkout@([^\s]+)/gm)]
+  assert.ok(checkouts.length >= 2)
+  for (const [, sha] of checkouts) assert.match(sha, /^[0-9a-f]{40}$/)
+  assert.equal((tests.match(/persist-credentials: false/g) || []).length, checkouts.length)
+})
+
+test('Chat analyzer and widget test gates always run on pull requests', () => {
+  assert.match(tests, /^on:\s*\r?\n  pull_request:\s*\r?\n/m)
+  assert.match(tests, /run: \.\/scripts\/code_analyze\.sh/)
+  assert.match(tests, /\bflutter test\b/)
+  assert.match(tests, /\bflutter analyze\b|run: \.\/scripts\/code_analyze\.sh/)
+  assert.match(tests, /flutter-version: \$\{\{ env\.FLUTTER_VERSION \}\}/)
+})
+
+test('preview builds must reject fork heads before accessing deployment write credentials', () => {
+  const preview = read('gh-pages.yaml')
+  assert.match(preview, /^\s+if: \$\{\{ github\.event\.repository\.fork == false && github\.event\.pull_request\.head\.repo\.full_name == github\.repository \}\}/m)
+  assert.match(preview, /pull_request:/)
+  assert.match(preview, /github_token: \$\{\{ secrets\.GITHUB_TOKEN \}\}/)
+  const cleanup = read('clean-up-gh-pages.yaml')
+  assert.match(cleanup, /^\s+if: \$\{\{ github\.event\.repository\.fork == false \}\}/m)
+})
+
+test('Patrol web Synapse runner cannot write checks or pull requests', () => {
+  const patrol = read('patrol-web-integration-test.yaml')
+  const testJob = patrol.split(/^  patrol-web:\s*$/m)[1]?.split(/^  [a-z][\w-]*:\s*$/m)[0]
+  assert.ok(testJob, 'Patrol web test job must exist')
+  assert.match(testJob, /permissions:\s*\r?\n\s+contents: read/)
+  assert.doesNotMatch(testJob, /^\s+(?:checks|pull-requests|contents): write\s*$/m)
+  assert.match(testJob, /upload-artifact@/)
+})
+
+test('real two-device Matrix SDK QR and SQLite recovery run on every PR and main', () => {
+  const live = read('matrix-flutter-sdk-live.yml')
+  const triggers = live.split(/^permissions:/m)[0]
+  // This is a security acceptance gate, not an optional path-limited smoke:
+  // the previous QR secret logging fix passed without running this suite.
+  assert.match(triggers, /^  pull_request:\s*$/m)
+  assert.match(triggers, /^  push:\s*$/m)
+  assert.match(triggers, /^    branches: \[main\]\s*$/m)
+  assert.doesNotMatch(triggers, /^\s+paths:\s*$/m)
+  assert.match(live, /permissions:\s*\r?\n  contents: read/)
+  assert.match(live, /scripts\/integration-server-synapse\.sh/)
+  assert.match(live, /--dart-define=TWAKE_LIVE_SYNAPSE=true/)
+  assert.match(live, /matrix_sdk_live_synapse_test\.dart/)
+  assert.doesNotMatch(live, /continue-on-error:\s*true/)
+})

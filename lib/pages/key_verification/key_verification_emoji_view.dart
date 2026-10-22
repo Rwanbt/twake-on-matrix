@@ -48,8 +48,13 @@ class KeyVerificationEmojiView extends StatelessWidget {
           style: KeyVerificationSasStyle.supportingStyle(context),
         ),
         const SizedBox(height: LinagoraSpacing.base * 2),
-        Row(
-          mainAxisSize: MainAxisSize.min,
+        // Labels can exceed a narrow viewport in some locales. Keep both SAS
+        // decisions fully visible and keyboard-operable by wrapping the row.
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: KeyVerificationSasStyle.gapEmojiButtons,
+          runSpacing: LinagoraSpacing.base,
           children: [
             TextButton(
               onPressed: onDontMatch,
@@ -58,7 +63,6 @@ class KeyVerificationEmojiView extends StatelessWidget {
                 style: KeyVerificationSasStyle.textButtonStyle(context),
               ),
             ),
-            const SizedBox(width: KeyVerificationSasStyle.gapEmojiButtons),
             Material(
               color: KeyVerificationSasStyle.primaryColor(context),
               borderRadius: BorderRadius.circular(

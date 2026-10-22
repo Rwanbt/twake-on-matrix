@@ -6,6 +6,7 @@ import 'package:twake_chat/config/app_constants.dart';
 import 'package:twake_chat/config/config_saas/config_saas.dart';
 import 'package:twake_chat/di/global/get_it_initializer.dart';
 import 'package:twake_chat/utils/debug_utils.dart';
+import 'package:twake_chat/utils/matrix_sensitive_log_guard.dart';
 import 'package:twake_chat/utils/platform_infos.dart';
 import 'package:twake_chat/utils/responsive/responsive_utils.dart';
 import 'package:flutter/foundation.dart';
@@ -328,7 +329,9 @@ abstract class AppConfig {
     }
     if (json['enable_logs'] is bool) {
       DebugUtils.enableLogs = json['enable_logs'];
-      Logs().level = DebugUtils().isDebugMode ? Level.verbose : Level.warning;
+      // Matrix SDK 7.2.2 logs the QR shared secret in INFO payloads.
+      // User-controlled debug logging must never re-enable their stdout.
+      MatrixSensitiveLogGuard.install();
     }
     if (json['support_url'] is String) {
       supportUrl = json['support_url'];

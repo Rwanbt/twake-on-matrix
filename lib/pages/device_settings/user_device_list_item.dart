@@ -40,8 +40,9 @@ class UserDeviceListItem extends StatelessWidget {
       ).localizedTimeShort(context),
     );
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    // InkWell supplies keyboard Enter/Space activation, focus and an
+    // accessible tap action in addition to pointer activation.
+    return InkWell(
       onTap: () => SessionAllActionsDialog.show(
         context,
         session: SessionSummary(

@@ -15,6 +15,7 @@ permissions:
 jobs:
   cleanup:
     name: Remove preview deployment
+    if: ${{ github.event.repository.fork == false }}
     runs-on: ubuntu-latest
     concurrency:
       group: gh-pages-writes

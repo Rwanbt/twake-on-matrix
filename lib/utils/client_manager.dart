@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:twake_chat/domain/keychain_sharing/keychain_sharing_manager.dart';
 import 'package:twake_chat/utils/custom_http_client.dart';
 import 'package:twake_chat/utils/custom_image_resizer.dart';
+import 'package:twake_chat/utils/matrix_sdk_database.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/flutter_hive_collections_database.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/twake_client.dart';
+import 'package:twake_chat/utils/matrix_sensitive_log_guard.dart';
 import 'package:twake_chat/utils/open_sqflite_db.dart';
 import 'package:twake_chat/utils/platform_infos.dart';
 import 'package:flutter/foundation.dart';
@@ -124,6 +126,7 @@ abstract class ClientManager {
       : NativeImplementationsIsolate(compute, vodozemacInit: () => vod.init());
 
   static Future<Client> createClient(String clientName) async {
+    MatrixSensitiveLogGuard.install();
     return TwakeClient(
       clientName,
       httpClient: PlatformInfos.isAndroid
@@ -133,6 +136,13 @@ abstract class ClientManager {
         KeyVerificationMethod.numbers,
         if (kIsWeb || PlatformInfos.isMobile || PlatformInfos.isLinux)
           KeyVerificationMethod.emoji,
+        // The Matrix SDK advertises QR methods only when the required
+        // cross-signing keys are available. Every Flutter target can display
+        // its binary QR payload, but raw scanner bytes are available only on
+        // the qr_code_scanner Android/iOS implementations.
+        KeyVerificationMethod.qrShow,
+        if (!kIsWeb && (PlatformInfos.isAndroid || PlatformInfos.isIOS))
+          KeyVerificationMethod.qrScan,
       },
       importantStateEvents: <String>{
         // To make room emotes work
@@ -140,11 +150,10 @@ abstract class ClientManager {
         // To check which story room we can post in
         EventTypes.RoomPowerLevels,
       },
-      logLevel: kReleaseMode ? Level.warning : Level.verbose,
-      database: await MatrixSdkDatabase.init(
-        clientName,
-        database: await openSqfliteDb(name: clientName),
-      ),
+      // SDK 7.2.2 logs raw verification QR secrets at INFO, so the
+      // console must remain below INFO even in debug builds.
+      logLevel: Level.warning,
+      database: await _createMatrixSdkDatabase(clientName),
       legacyDatabaseBuilder: FlutterHiveCollectionsDatabase.databaseBuilder,
       supportedLoginTypes: {
         AuthenticationTypes.password,
@@ -156,5 +165,23 @@ abstract class ClientManager {
       nativeImplementations: nativeImplementations,
       customImageResizer: PlatformInfos.isMobile ? customImageResizer : null,
     );
+  }
+
+  /// Builds the Matrix SDK database of the client [clientName].
+  ///
+  /// The SDK database must know the SQLite factory that owns its file,
+  /// otherwise the SDK cannot delete that file when a session is dropped and
+  /// aborts the logout sequence. See [buildMatrixSdkDatabase].
+  static Future<MatrixSdkDatabase> _createMatrixSdkDatabase(
+    String clientName,
+  ) async {
+    final database = await openSqfliteDb(name: clientName);
+    if (database == null) {
+      // Targets without a SQLite file (web) use the SDK IndexedDB backend,
+      // which must not be given a sqflite factory: its delete path expects
+      // an IDBFactory.
+      return MatrixSdkDatabase.init(clientName);
+    }
+    return buildMatrixSdkDatabase(clientName, database);
   }
 }

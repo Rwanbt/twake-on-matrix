@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:linagora_design_flutter/style/linagora_text_theme.dart';
+import 'package:linagora_design_flutter/linagora_design_flutter.dart';
 
 import 'package:twake_chat/config/localizations/localization_service.dart';
 import 'package:twake_chat/generated/l10n/app_localizations.dart';
@@ -72,6 +72,72 @@ Future<void> _savingEmptyNameIsNoOp(WidgetTester tester) async {
   );
 
   expect(saveCalled, isFalse);
+  expect(find.byType(ChangeDeviceNameView), findsOneWidget);
+  expect(
+    tester.widget<LinagoraTextField>(find.byType(LinagoraTextField)).errorText,
+    isNotEmpty,
+  );
+}
+
+Future<void> _submittingWithKeyboardSavesExactlyOnce(
+  WidgetTester tester,
+) async {
+  var calls = 0;
+  String? submitted;
+  await _pumpView(
+    tester,
+    onSave: (name) async {
+      calls++;
+      submitted = name;
+    },
+  );
+  await tester.enterText(find.byType(TextField), '  Trusted laptop  ');
+  await tester.testTextInput.receiveAction(TextInputAction.done);
+  await tester.pump();
+  expect(submitted, 'Trusted laptop');
+  expect(calls, 1);
+}
+
+Future<void> _invalidKeyboardSubmitRetainsInput(WidgetTester tester) async {
+  var calls = 0;
+  await _pumpView(tester, onSave: (_) async => calls++);
+  await tester.enterText(find.byType(TextField), '   ');
+  await tester.testTextInput.receiveAction(TextInputAction.done);
+  await tester.pump();
+  expect(calls, 0);
+  expect(find.byType(ChangeDeviceNameView), findsOneWidget);
+  expect(
+    tester.widget<TextField>(find.byType(TextField)).controller!.text,
+    '   ',
+  );
+}
+
+Future<void> _compactScreenKeepsDeviceNameKeyboardWorkflow(
+  WidgetTester tester,
+) async {
+  // A narrow mobile viewport must keep the control usable and its field
+  // accessible through the keyboard, not just render on desktop.
+  tester.view.physicalSize = const Size(320, 640);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  String? submitted;
+  await _pumpView(tester, onSave: (name) async => submitted = name);
+  await tester.pumpAndSettle();
+
+  expect(tester.takeException(), isNull);
+  expect(
+    tester.getSize(find.byType(ChangeDeviceNameView)).width,
+    lessThanOrEqualTo(320),
+  );
+  final field = tester.widget<TextField>(find.byType(TextField));
+  expect(field.textInputAction, TextInputAction.done);
+
+  await tester.enterText(find.byType(TextField), 'Compact phone');
+  await tester.testTextInput.receiveAction(TextInputAction.done);
+  await tester.pump();
+  expect(submitted, 'Compact phone');
 }
 
 Future<void> _onSaveErrorKeepsModalOpenWithError(WidgetTester tester) async {
@@ -114,6 +180,19 @@ void main() {
   testWidgets(
     'saving an empty name is a no-op (does not call onSave)',
     _savingEmptyNameIsNoOp,
+  );
+  testWidgets(
+    'the keyboard Done action saves one trimmed device name',
+    _submittingWithKeyboardSavesExactlyOnce,
+  );
+  testWidgets(
+    'invalid keyboard submission preserves the dialog and entered content',
+    _invalidKeyboardSubmitRetainsInput,
+  );
+
+  testWidgets(
+    'compact 320px layout permits accessible keyboard submission',
+    _compactScreenKeepsDeviceNameKeyboardWorkflow,
   );
 
   testWidgets(

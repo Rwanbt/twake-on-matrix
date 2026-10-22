@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:twake_chat/data/repository/recovery_key_storage_repository_impl.dart';
+
 import 'package:twake_chat/config/app_config.dart';
 
 import 'package:twake_chat/di/global/get_it_initializer.dart';
@@ -115,6 +118,13 @@ class SettingsController extends State<Settings> with ConnectPageMixin {
     return;
   }
 
+  Future<void> _deleteCachedSsssRecoveryKey(String? userId) async {
+    if (userId == null) return;
+    await const RecoveryKeyStorageRepositoryImpl(
+      FlutterSecureStorage(),
+    ).delete(userId: userId);
+  }
+
   Future<void> _logoutActionsOnMobile() async {
     await TwakeDialog.showFutureLoadingDialogFullScreen(
       future: () async {
@@ -128,6 +138,7 @@ class SettingsController extends State<Settings> with ConnectPageMixin {
             _deleteTomConfigurations(matrix.client),
             _deleteFederationConfigurations(matrix.client),
             KeychainSharingManager.deleteRecoveryKey(userId: userId),
+            _deleteCachedSsssRecoveryKey(userId),
           ]);
         } catch (e) {
           Logs().e('SettingsController()::_logoutActionsOnMobile - error: $e');
@@ -149,6 +160,7 @@ class SettingsController extends State<Settings> with ConnectPageMixin {
             _deleteTomConfigurations(matrix.client),
             _deleteFederationConfigurations(matrix.client),
             KeychainSharingManager.deleteRecoveryKey(userId: userId),
+            _deleteCachedSsssRecoveryKey(userId),
           ]);
         } catch (e) {
           Logs().e('SettingsController()::_logoutActions - error: $e');

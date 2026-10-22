@@ -24,6 +24,9 @@ sealed class VerifyDeviceUiState with _$VerifyDeviceUiState {
   const factory VerifyDeviceUiState.sas({
     required KeyVerification request,
     required KeyVerificationState requestState,
+    @Default(false) bool isScanningQr,
+    @Default(false) bool isQrInFlight,
+    String? qrErrorMessage,
   }) = VerifyDeviceSasState;
 
   const factory VerifyDeviceUiState.recoveryKeyForm({

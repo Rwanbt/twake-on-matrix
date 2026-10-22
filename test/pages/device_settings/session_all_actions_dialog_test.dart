@@ -153,6 +153,30 @@ Future<void> _tappingCancelPopsWithoutInvokingAnyAction(
   expect(tapped, isFalse);
 }
 
+Future<void> _compactDeviceActionsRemainAccessible(WidgetTester tester) async {
+  tester.view.physicalSize = const Size(320, 640);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
+  await _pumpOtherDevice(
+    tester,
+    onChangeName: () {},
+    onStartVerification: () {},
+    onRemove: () {},
+  );
+  await tester.pump();
+
+  expect(tester.takeException(), isNull);
+  expect(find.text('Start verification'), findsOneWidget);
+  expect(find.text('Remove device'), findsOneWidget);
+  expect(find.text('Cancel'), findsOneWidget);
+  expect(
+    tester.getSize(find.byType(SessionAllActionsView)).width,
+    lessThanOrEqualTo(320),
+  );
+}
+
 void main() {
   testWidgets(
     'renders session name, last activity and available actions',
@@ -182,5 +206,9 @@ void main() {
   testWidgets(
     'tapping Cancel pops without invoking any action',
     _tappingCancelPopsWithoutInvokingAnyAction,
+  );
+  testWidgets(
+    'narrow 320px view retains device verification and revoke controls',
+    _compactDeviceActionsRemainAccessible,
   );
 }
