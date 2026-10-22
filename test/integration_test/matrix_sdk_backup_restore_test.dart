@@ -381,14 +381,10 @@ void main() {
 
       // ---- Step 10: the first device is revoked ----
       final revokeStatus = await revokeDevice(
-        secondSession['access_token'] as String,
+        session['access_token'] as String,
         first.deviceID!,
       );
-      expect(
-        revokeStatus,
-        200,
-        reason: 'The device revocation must succeed',
-      );
+      expect(revokeStatus, 200, reason: 'The device revocation must succeed');
       final firstToken = session['access_token'] as String;
       expect(
         await isSessionAlive(firstToken),
