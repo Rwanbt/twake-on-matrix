@@ -23,7 +23,7 @@ const String disposableAttachment = 'disposable-attachment.bin';
 
 /// Tells whether the client knows the cross-signing master key.
 bool hasMasterKey(TwakeClient client) {
-  final ssss = client.encryption!.sss;
+  final ssss = client.encryption!.ssss;
   return ssss.getCached(EventTypes.CrossSigningMasterKey) != null;
 }
 
@@ -112,16 +112,16 @@ void main() {
       // The second device learns the SSSS key of the account from the server.
       await syncUntil(
         [second],
-        () => second.encryption!.sss.defaultKeyId != null,
+        () => second.encryption!.ssss.defaultKeyId != null,
         'ssss default key published by the server',
       );
-      final keyId = second.encryption!.sss.defaultKeyId!;
+      final keyId = second.encryption!.ssss.defaultKeyId!;
       expect(
-        second.encryption!.sss.getKey(keyId),
+        second.encryption!.ssss.getKey(keyId),
         isNotNull,
         reason: 'The server must publish the SSSS key information',
       );
-      final openSsss = second.encryption!.sss.open(keyId);
+      final openSsss = second.encryption!.ssss.open(keyId);
 
       // ---- Step 6: a wrong recovery key must be refused ----
       final wrongBytes = Uint8List.fromList(
@@ -229,11 +229,11 @@ void main() {
       await second.oneShotSync(timeout: const Duration(milliseconds: 100));
       await syncUntil(
         [second],
-        () => second.encryption!.sss.defaultKeyId != null,
+        () => second.encryption!.ssss.defaultKeyId != null,
         'ssss default key published by the server',
       );
-      final keyId = second.encryption!.sss.defaultKeyId!;
-      final openSsss = second.encryption!.sss.open(keyId);
+      final keyId = second.encryption!.ssss.defaultKeyId!;
+      final openSsss = second.encryption!.ssss.open(keyId);
       // ---- Step 6: a wrong recovery key must be refused ----
       final wrongBytes = Uint8List.fromList(
         SSSS.decodeRecoveryKey(recoveryKey),
@@ -318,11 +318,11 @@ void main() {
       await third.oneShotSync(timeout: const Duration(milliseconds: 100));
       await syncUntil(
         [third],
-        () => third.encryption!.sss.defaultKeyId != null,
+        () => third.encryption!.ssss.defaultKeyId != null,
         'ssss default key published by the server',
       );
-      final thirdSsss = third.encryption!.sss.open(
-        third.encryption!.sss.defaultKeyId!,
+      final thirdSsss = third.encryption!.ssss.open(
+        third.encryption!.ssss.defaultKeyId!,
       );
       await thirdSsss.unlock(recoveryKey: recoveryKey);
       expect(thirdSsss.isUnlocked, isTrue);
