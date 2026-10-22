@@ -19,4 +19,8 @@ class RecoveryKeyStorageRepositoryImpl implements RecoveryKeyStorageRepository {
   @override
   Future<String?> read({required String userId}) =>
       _storage.read(key: _storageKey(userId));
+
+  @override
+  Future<void> delete({required String userId}) =>
+      _storage.delete(key: _storageKey(userId));
 }
