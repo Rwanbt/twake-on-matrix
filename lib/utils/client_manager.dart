@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:twake_chat/domain/keychain_sharing/keychain_sharing_manager.dart';
 import 'package:twake_chat/utils/custom_http_client.dart';
 import 'package:twake_chat/utils/custom_image_resizer.dart';
+import 'package:twake_chat/utils/matrix_sdk_database.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/flutter_hive_collections_database.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/twake_client.dart';
 import 'package:twake_chat/utils/matrix_sensitive_log_guard.dart';
@@ -152,10 +153,7 @@ abstract class ClientManager {
       // SDK 7.2.2 logs raw verification QR secrets at INFO, so the
       // console must remain below INFO even in debug builds.
       logLevel: Level.warning,
-      database: await MatrixSdkDatabase.init(
-        clientName,
-        database: await openSqfliteDb(name: clientName),
-      ),
+      database: await _createMatrixSdkDatabase(clientName),
       legacyDatabaseBuilder: FlutterHiveCollectionsDatabase.databaseBuilder,
       supportedLoginTypes: {
         AuthenticationTypes.password,
@@ -167,5 +165,23 @@ abstract class ClientManager {
       nativeImplementations: nativeImplementations,
       customImageResizer: PlatformInfos.isMobile ? customImageResizer : null,
     );
+  }
+
+  /// Builds the Matrix SDK database of the client [clientName].
+  ///
+  /// The SDK database must know the SQLite factory that owns its file,
+  /// otherwise the SDK cannot delete that file when a session is dropped and
+  /// aborts the logout sequence. See [buildMatrixSdkDatabase].
+  static Future<MatrixSdkDatabase> _createMatrixSdkDatabase(
+    String clientName,
+  ) async {
+    final database = await openSqfliteDb(name: clientName);
+    if (database == null) {
+      // Targets without a SQLite file (web) use the SDK IndexedDB backend,
+      // which must not be given a sqflite factory: its delete path expects
+      // an IDBFactory.
+      return MatrixSdkDatabase.init(clientName);
+    }
+    return buildMatrixSdkDatabase(clientName, database);
   }
 }

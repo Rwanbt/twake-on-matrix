@@ -9,6 +9,7 @@ import 'package:matrix/encryption.dart';
 import 'package:matrix/matrix.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:twake_chat/utils/matrix_sdk_database.dart';
 import 'package:twake_chat/utils/matrix_sdk_extensions/twake_client.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_qr_trust_persistence.dart';
 import 'package:twake_chat/utils/matrix_sensitive_log_guard.dart';
@@ -71,7 +72,7 @@ Future<TwakeClient> _openSdkClient(
   // by a private SQLite file. A Mockito database drops the Olm account and
   // cannot represent a real reconnect of the same Matrix device.
   final sqlite = await databaseFactoryFfi.openDatabase(databasePath);
-  final database = await MatrixSdkDatabase.init(name, database: sqlite);
+  final database = await buildMatrixSdkDatabase(name, sqlite);
   final client = TwakeClient(
     name,
     database: database,
@@ -391,6 +392,12 @@ void main() {
       addTearDown(client.dispose);
       expect((await client.sync(timeout: 0)).nextBatch, isNotEmpty);
 
+      // The SDK background sync is stopped here: the SDK reacts to a revoked
+      // token by clearing its own database, and that reaction must be
+      // observed deterministically instead of racing with the teardown of
+      // this test. abortSync() also disables the background sync loop.
+      await client.abortSync();
+
       // Actual homeserver revocation, not merely a made-up bad credential.
       final logout = await http.post(
         localSynapse.resolve('/_matrix/client/v3/logout'),
@@ -402,11 +409,25 @@ void main() {
         headers: {'authorization': 'Bearer $token'},
       );
       expect(rejected.statusCode, 401);
-      // The server refuses the exact token previously used by TwakeClient.
-      // Do not start another SDK sync here: its background sync can trigger
-      // automatic logout/database disposal while the test tears down SQLite.
+      // The server refuses the exact token previously used by TwakeClient,
+      // so the SDK session can no longer be used at all.
+      await expectLater(
+        client.sync(timeout: 0),
+        throwsA(isA<MatrixException>()),
+      );
+      // The SDK must also drop the revoked session by itself. Clearing the
+      // session deletes the SDK database, which only works when the SDK
+      // knows the SQLite factory that owns the file: see
+      // buildMatrixSdkDatabase.
+      await client.oneShotSync(timeout: const Duration(milliseconds: 100));
+      expect(
+        client.isLogged(),
+        isFalse,
+        reason: 'A revoked Matrix session must not stay logged in',
+      );
     },
     skip: !runLiveSynapse,
+    timeout: const Timeout(Duration(minutes: 5)),
   );
 
   test(
