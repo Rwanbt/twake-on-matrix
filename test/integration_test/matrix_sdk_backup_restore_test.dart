@@ -401,7 +401,7 @@ void main() {
       // The remaining devices must be able to verify each other again, and
       // the verification must be explicit: no implicit trust is created by
       // the revocation.
-      await verifyDevicesByQr(shower: second, scanner: third);
+      await verifyDevicesByQr(shower: second, scanner: restarted);
       await second.updateUserDeviceKeys();
       await third.updateUserDeviceKeys();
       expect(
