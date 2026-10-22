@@ -2,6 +2,7 @@ import 'package:twake_chat/config/localizations/localization_service.dart';
 import 'package:twake_chat/generated/l10n/app_localizations.dart';
 import 'package:twake_chat/pages/chat/events/message_time.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_localized_locales/flutter_localized_locales.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -49,7 +50,10 @@ void main() {
         },
         originServerTs: DateTime(2024, 1, 1, 12, 35),
       );
-      final timeline = Timeline(room: room, chunk: TimelineChunk(events: []));
+      final timeline = Timeline(
+        room: room,
+        chunk: TimelineChunk(events: []),
+      );
       timeline.addAggregatedEvent(edit);
       room.setState(
         Event(
@@ -100,7 +104,9 @@ void main() {
       for (final label in ['edited ', '12:35']) {
         final paragraph = tester.renderObject<RenderParagraph>(
           find.descendant(
-              of: find.text(label), matching: find.byType(RichText)),
+            of: find.text(label),
+            matching: find.byType(RichText),
+          ),
         );
         expect(paragraph.textScaler.scale(10), 20);
       }
