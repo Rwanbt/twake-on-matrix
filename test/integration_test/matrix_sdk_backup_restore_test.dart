@@ -71,7 +71,7 @@ void main() {
       final room = first.getRoomById(roomId);
       expect(room, isNotNull);
       await room!.enableEncryption();
-      final messageId = await room.sendTextEvent(disposableMessage);
+      final messageId = (await room.sendTextEvent(disposableMessage))!;
       expect(messageId, isNotNull);
       final fileEventId = await room.sendFileEvent(
         MatrixFile(
@@ -201,7 +201,7 @@ void main() {
       final room = first.getRoomById(roomId);
       expect(room, isNotNull);
       await room!.enableEncryption();
-      final messageId = await room.sendTextEvent(disposableMessage);
+      final messageId = (await room.sendTextEvent(disposableMessage))!;
       expect(messageId, isNotNull);
       final fileEventId = await room.sendFileEvent(
         MatrixFile(
@@ -249,7 +249,7 @@ void main() {
         'the room on the second device',
       );
       final secondRoom = second.getRoomById(roomId)!;
-      final encrypted = await secondRoom.getEventById(messageId!);
+      final encrypted = await secondRoom.getEventById(messageId);
       expect(encrypted, isNotNull);
 
       // ---- Step 7: the correct recovery key recovers the cross-signing keys ----
@@ -272,7 +272,7 @@ void main() {
       // backup of the account or from the device sharing of the Matrix SDK:
       // what is attested here is that the Megolm session is available again
       // and that the historical message is decrypted.
-      final restored = await secondRoom.getEventById(messageId!);
+      final restored = await secondRoom.getEventById(messageId);
       expect(restored, isNotNull);
       final decrypted = await second.encryption!.decryptRoomEvent(restored!);
       expect(
@@ -316,7 +316,7 @@ void main() {
         'the room on the third device',
       );
       final thirdRoom = third.getRoomById(roomId)!;
-      final thirdRaw = await thirdRoom.getEventById(messageId!);
+      final thirdRaw = await thirdRoom.getEventById(messageId);
       expect(thirdRaw, isNotNull);
       expect(thirdRaw, isNotNull);
       await syncUntil(
@@ -338,7 +338,7 @@ void main() {
       // The third device never received a forwarded room key: the only way
       // for it to decrypt the history is the server side backup.
       await third.encryption!.keyManager.loadAllKeysFromRoom(roomId);
-      final thirdRestored = await thirdRoom.getEventById(messageId!);
+      final thirdRestored = await thirdRoom.getEventById(messageId);
       expect(thirdRestored, isNotNull);
       final thirdDecrypted = await third.encryption!.decryptRoomEvent(
         thirdRestored!,
@@ -368,7 +368,7 @@ void main() {
       );
       final restartedRaw = await restarted
           .getRoomById(roomId)!
-          .getEventById(messageId!);
+          .getEventById(messageId);
       expect(restartedRaw, isNotNull);
       final restartedDecrypted = await restarted.encryption!.decryptRoomEvent(
         restartedRaw!,
