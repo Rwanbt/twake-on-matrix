@@ -4,12 +4,22 @@ const { readFileSync, readdirSync } = require('node:fs')
 const { join } = require('node:path')
 
 const workflowDir = join(__dirname, '..', '.github', 'workflows')
-const files = readdirSync(workflowDir).filter(f => /\.ya?ml$/.test(f))
+const files = [
+  'build.yaml',
+  'clean-up-gh-pages.yaml',
+  'gh-pages.yaml',
+  'image.yaml',
+  'integration-tests.yaml',
+  'patrol-web-integration-test.yaml',
+  'perf-backfill.yaml',
+  'release.yaml',
+]
 
 const USES = /^\s*-?\s*uses:\s*([^\s#]+)/gm
 
 test('every GitHub Action in Chat workflows is pinned to a 40-hex SHA', () => {
   for (const file of files) {
+    assert.ok(readdirSync(workflowDir).includes(file), `${file}: workflow is missing`)
     const content = readFileSync(join(workflowDir, file), 'utf8')
     for (const match of content.matchAll(USES)) {
       const ref = match[1]
