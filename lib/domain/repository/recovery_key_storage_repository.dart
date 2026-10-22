@@ -6,4 +6,7 @@ abstract class RecoveryKeyStorageRepository {
 
   /// Returns the cached recovery key for [userId], or `null` if none.
   Future<String?> read({required String userId});
+
+  /// Deletes only this account's cached recovery secret (e.g. on logout).
+  Future<void> delete({required String userId});
 }
