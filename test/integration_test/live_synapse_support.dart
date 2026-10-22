@@ -268,6 +268,7 @@ Future<int> revokeDevice(String token, String deviceId) async {
   if (bulk.statusCode == 200) return bulk.statusCode;
   return delete.statusCode;
 }
+
 /// Tells whether the session of [token] is still accepted by the homeserver.
 Future<bool> isSessionAlive(String token) async {
   final response = await http.get(
