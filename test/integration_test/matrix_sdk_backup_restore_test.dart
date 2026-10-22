@@ -83,7 +83,7 @@ void main() {
             List<int>.generate(256, (index) => index % 256),
           ),
           name: disposableAttachment,
-          mimetype: 'application/octet-stream',
+          mimeType: 'application/octet-stream',
         ),
       );
       expect(fileEventId, isNotNull);
@@ -213,16 +213,10 @@ void main() {
             List<int>.generate(256, (index) => index % 256),
           ),
           name: disposableAttachment,
-          mimetype: 'application/octet-stream',
+          mimeType: 'application/octet-stream',
         ),
       );
       expect(fileEventId, isNotNull);
-
-      // The application forwards a room key request of one of its own
-      // devices, exactly like the Twake application does.
-      first.onRoomKeyRequest.stream.listen((request) async {
-        await request.forwardKey();
-      });
 
       // ---- Step 5: a second device without any initial trust ----
       final secondSession = await loginSecondDisposableDevice(userId);
@@ -240,7 +234,6 @@ void main() {
       );
       final keyId = second.encryption!.sss.defaultKeyId!;
       final openSsss = second.encryption!.sss.open(keyId);
-
       // ---- Step 6: a wrong recovery key must be refused ----
       final wrongBytes = Uint8List.fromList(
         SSSS.decodeRecoveryKey(recoveryKey),
@@ -261,8 +254,7 @@ void main() {
         'cross-signing master key restored from the secret storage',
       );
 
-      // The second device receives the room key of the account (the SDK asks
-      // for it, the first device forwards it) and can decrypt the history.
+      // The second device sees the encrypted message of the room.
       await syncUntil(
         [second],
         () => second.getRoomById(roomId) != null,
@@ -272,15 +264,26 @@ void main() {
       final encrypted = await secondRoom.getEventById(messageId!);
       expect(encrypted, isNotNull);
       expect(encrypted!.type, EventTypes.Encrypted);
-      final sessionId = encrypted.content['session_id'] as String;
-      final senderKey = encrypted.content['sender_key'] as String;
-      // The application asks the other devices of the account for the room
-      // key it is missing.
-      await second.encryption!.keyManager.request(
-        secondRoom,
-        sessionId,
-        senderKey,
+
+      // The first device shares the room key with the new device of the
+      // account: the Matrix SDK does it with the next message sent in the
+      // room, once it knows the device keys of the new device and once the
+      // new device is verified. The verification is explicit: the recovery
+      // of the secret storage alone never grants the device the trust of
+      // the first device.
+      await verifyDevicesByQr(shower: first, scanner: second);
+      await syncUntil(
+        [first, second],
+        () => first.userDeviceKeys[userId]?.deviceKeys[second.deviceID] != null,
+        'the device keys of the second device known by the first device',
       );
+      final sharedMessageId = await room.sendTextEvent(
+        'disposable backup message shared with the second device',
+      );
+      expect(sharedMessageId, isNotNull);
+      final sharedEvent = await secondRoom.getEventById(sharedMessageId!);
+      expect(sharedEvent, isNotNull);
+      final sessionId = sharedEvent!.content['session_id'] as String;
       await syncUntil(
         [second, first],
         () => hasRoomKey(second, roomId, sessionId),
