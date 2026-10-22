@@ -416,7 +416,9 @@ void main() {
         await vod.init(libraryPath: './vodozemac/debug/');
       }
       sqfliteFfiInit();
-      final temp = await Directory.systemTemp.createTemp('twake-ssss-new-device-');
+      final temp = await Directory.systemTemp.createTemp(
+        'twake-ssss-new-device-',
+      );
       addTearDown(() => temp.delete(recursive: true));
       final session = await _registerDisposableUser();
       final origin = await _openSdkClient(
