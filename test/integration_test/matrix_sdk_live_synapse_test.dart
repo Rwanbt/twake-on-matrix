@@ -410,6 +410,53 @@ void main() {
   );
 
   test(
+    'new device does not inherit verified master trust from SSSS setup',
+    () async {
+      if (!vod.isInitialized()) {
+        await vod.init(libraryPath: './vodozemac/debug/');
+      }
+      sqfliteFfiInit();
+      final temp = await Directory.systemTemp.createTemp('twake-ssss-new-device-');
+      addTearDown(() => temp.delete(recursive: true));
+      final session = await _registerDisposableUser();
+      final origin = await _openSdkClient(
+        'ssss-original',
+        session,
+        databasePath: path.join(temp.path, 'original.sqlite'),
+      );
+      addTearDown(origin.dispose);
+      await origin.oneShotSync(timeout: const Duration(milliseconds: 100));
+      await _bootstrapRealCrossSigning(origin);
+
+      final secondSession = await _loginSecondDisposableDevice(
+        session['user_id'] as String,
+      );
+      final fresh = await _openSdkClient(
+        'ssss-fresh',
+        secondSession,
+        databasePath: path.join(temp.path, 'fresh.sqlite'),
+      );
+      addTearDown(fresh.dispose);
+      await fresh.oneShotSync(timeout: const Duration(milliseconds: 100));
+      await fresh.updateUserDeviceKeys();
+      final keys = fresh.userDeviceKeys[fresh.userID];
+      expect(keys?.masterKey, isNotNull);
+      expect(
+        keys?.masterKey?.directVerified,
+        isNot(true),
+        reason: 'New device must not implicitly trust existing SSSS master',
+      );
+      expect(
+        fresh.deviceID,
+        isNot(origin.deviceID),
+        reason: 'The recovery candidate must be a distinct Matrix device',
+      );
+    },
+    skip: !runLiveSynapse,
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
+
+  test(
     'real two-device QR trust with Synapse',
     _runRealQrTest,
     skip: !runLiveSynapse,
