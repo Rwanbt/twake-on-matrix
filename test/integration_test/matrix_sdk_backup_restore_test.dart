@@ -255,7 +255,17 @@ void main() {
       final secondRoom = second.getRoomById(roomId)!;
       final encrypted = await secondRoom.getEventById(messageId!);
       expect(encrypted, isNotNull);
-      final sessionId = encrypted!.content['session_id'] as String;
+      // The Megolm session of the room is known by the sending device.
+      await syncUntil(
+        [first],
+        () =>
+            first.encryption!.keyManager.getOutboundGroupSession(roomId) !=
+            null,
+        'the outbound session of the room',
+      );
+      final sessionId = first.encryption!.keyManager
+          .getOutboundGroupSession(roomId)!
+          .sessionId;
 
       // ---- Step 7: the correct recovery key recovers the cross-signing keys ----
       await openSsss.unlock(recoveryKey: recoveryKey);
