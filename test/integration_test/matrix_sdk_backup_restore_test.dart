@@ -28,12 +28,6 @@ bool hasMasterKey(TwakeClient client) {
   return keys?.masterKey?.verified == true;
 }
 
-/// Tells whether the client knows the Megolm session of a room.
-bool hasRoomKey(TwakeClient client, String roomId, String sessionId) {
-  final manager = client.encryption!.keyManager;
-  return manager.getInboundGroupSession(roomId, sessionId) != null;
-}
-
 void main() {
   // Live integration binding permits actual loopback HTTP requests; the
   // regular widget-test binding intercepts HttpClient and returns HTTP 400.
@@ -256,15 +250,6 @@ void main() {
       final secondRoom = second.getRoomById(roomId)!;
       final encrypted = await secondRoom.getEventById(messageId!);
       expect(encrypted, isNotNull);
-      // The Megolm session of the room is known by the sending device.
-      final keyManager = first.encryption!.keyManager;
-      await syncUntil(
-        [first],
-        () => keyManager.getOutboundGroupSession(roomId) != null,
-        'the outbound session of the room',
-      );
-      final outbound = keyManager.getOutboundGroupSession(roomId)!;
-      final sessionId = outbound.outboundGroupSession!.sessionId;
 
       // ---- Step 7: the correct recovery key recovers the cross-signing keys ----
       await openSsss.unlock(recoveryKey: recoveryKey);
@@ -286,19 +271,15 @@ void main() {
       // backup of the account or from the device sharing of the Matrix SDK:
       // what is attested here is that the Megolm session is available again
       // and that the historical message is decrypted.
-      await syncUntil(
-        [second, first],
-        () => hasRoomKey(second, roomId, sessionId),
-        'the room key restored on the second device',
-      );
       final restored = await secondRoom.getEventById(messageId!);
       expect(restored, isNotNull);
+      final decrypted = await second.encryption!.decryptRoomEvent(restored!);
       expect(
-        restored!.type,
+        decrypted.type,
         EventTypes.Message,
         reason: 'The restored room key must decrypt the historical message',
       );
-      expect(restored.content['body'], disposableMessage);
+      expect(decrypted.content['body'], disposableMessage);
 
       // ---- Step 4: the room key is uploaded to the server side backup ----
       await first.encryption!.keyManager.uploadInboundGroupSessions();
@@ -310,11 +291,6 @@ void main() {
         backup,
         isNotEmpty,
         reason: 'The homeserver must hold the room key of the account',
-      );
-      expect(
-        backup.containsKey(sessionId),
-        isTrue,
-        reason: 'The server side backup must hold the Megolm session',
       );
 
       // ---- Step 8: another device restores the room key from the backup ----
@@ -355,19 +331,17 @@ void main() {
       );
       // The third device never received a forwarded room key: the only way
       // for it to decrypt the history is the server side backup.
-      await syncUntil(
-        [third, first],
-        () => hasRoomKey(third, roomId, sessionId),
-        'the room key restored on the third device',
-      );
+      await third.encryption!.keyManager.loadAllKeysFromRoom(roomId);
       final thirdRestored = await thirdRoom.getEventById(messageId!);
       expect(thirdRestored, isNotNull);
+      final thirdDecrypted =
+          await third.encryption!.decryptRoomEvent(thirdRestored!);
       expect(
-        thirdRestored!.type,
+        thirdDecrypted.type,
         EventTypes.Message,
         reason: 'The restored room key must decrypt the historical message',
       );
-      expect(thirdRestored.content['body'], disposableMessage);
+      expect(thirdDecrypted.content['body'], disposableMessage);
 
       // ---- Step 9: the restored state survives a restart of the app ----
       await third.dispose();
@@ -385,14 +359,17 @@ void main() {
         isTrue,
         reason: 'The recovered trust must survive the SQLite reopen',
       );
+      final restartedRaw =
+          await restarted.getRoomById(roomId)!.getEventById(messageId!);
+      expect(restartedRaw, isNotNull);
+      final restartedDecrypted =
+          await restarted.encryption!.decryptRoomEvent(restartedRaw!);
       expect(
-        restarted.encryption!.keyManager.getInboundGroupSession(
-          roomId,
-          sessionId,
-        ),
-        isNotNull,
+        restartedDecrypted.type,
+        EventTypes.Message,
         reason: 'The restored room key must survive the SQLite reopen',
       );
+      expect(restartedDecrypted.content['body'], disposableMessage);
 
       // ---- Step 10: the first device is revoked ----
       final revoked = await revokeDevice(
