@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -9,8 +8,6 @@ import 'package:matrix/encryption.dart';
 import 'package:matrix/matrix.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:twake_chat/utils/matrix_sdk_database.dart';
-import 'package:twake_chat/utils/matrix_sdk_extensions/twake_client.dart';
 import 'package:twake_chat/pages/key_verification/key_verification_qr_trust_persistence.dart';
 import 'package:twake_chat/utils/matrix_sensitive_log_guard.dart';
 // Same transitive native crypto fixture as test/fake_client.dart; the app
@@ -18,137 +15,9 @@ import 'package:twake_chat/utils/matrix_sensitive_log_guard.dart';
 // ignore: depend_on_referenced_packages
 import 'package:vodozemac/vodozemac.dart' as vod;
 
+import 'live_synapse_support.dart';
+
 const runLiveSynapse = bool.fromEnvironment('TWAKE_LIVE_SYNAPSE');
-final localSynapse = Uri.parse('http://127.0.0.1');
-
-Future<Map<String, dynamic>> _registerDisposableUser() async {
-  if (localSynapse.scheme != 'http' || localSynapse.host != '127.0.0.1') {
-    throw StateError(
-      'Live SDK test is restricted to disposable loopback Synapse',
-    );
-  }
-  final response = await http.post(
-    localSynapse.resolve('/_matrix/client/v3/register'),
-    headers: {'content-type': 'application/json'},
-    body: jsonEncode({
-      'username': 'flutter_sdk_${DateTime.now().microsecondsSinceEpoch}',
-      'password': 'disposable_test_only_password',
-      'auth': {'type': 'm.login.dummy'},
-    }),
-  );
-  expect(
-    response.statusCode,
-    200,
-    reason: 'The test requires a running disposable Matrix Synapse',
-  );
-  final result = jsonDecode(response.body) as Map<String, dynamic>;
-  expect(result['access_token'], isNotEmpty);
-  return result;
-}
-
-Future<Map<String, dynamic>> _loginSecondDisposableDevice(String userId) async {
-  final response = await http.post(
-    localSynapse.resolve('/_matrix/client/v3/login'),
-    headers: {'content-type': 'application/json'},
-    body: jsonEncode({
-      'type': 'm.login.password',
-      'identifier': {'type': 'm.id.user', 'user': userId},
-      'password': 'disposable_test_only_password',
-      'initial_device_display_name': 'qr-second-device',
-    }),
-  );
-  expect(response.statusCode, 200, reason: 'Second real device login failed');
-  return jsonDecode(response.body) as Map<String, dynamic>;
-}
-
-Future<TwakeClient> _openSdkClient(
-  String name,
-  Map<String, dynamic> session, {
-  required String databasePath,
-  bool restoreStoredSession = false,
-  String? token,
-}) async {
-  // Use the same MatrixSdkDatabase implementation as ClientManager, backed
-  // by a private SQLite file. A Mockito database drops the Olm account and
-  // cannot represent a real reconnect of the same Matrix device.
-  final sqlite = await databaseFactoryFfi.openDatabase(databasePath);
-  final database = await buildMatrixSdkDatabase(name, sqlite);
-  final client = TwakeClient(
-    name,
-    database: database,
-    logLevel: Level.warning,
-    verificationMethods: {
-      KeyVerificationMethod.numbers,
-      KeyVerificationMethod.qrShow,
-      KeyVerificationMethod.qrScan,
-    },
-  );
-  if (restoreStoredSession) {
-    // Match ClientManager.getClients: a reconnect reads Olm account and
-    // credentials from the SDK database. Supplying newToken/newDeviceID would
-    // erroneously register a fresh cryptographic identity for the same ID.
-    await client.init(
-      waitForFirstSync: false,
-      waitUntilLoadCompletedLoaded: false,
-    );
-    return client;
-  }
-  await client.checkHomeserver(localSynapse, checkWellKnown: false);
-  await client.init(
-    newToken: token ?? session['access_token'] as String,
-    newUserID: session['user_id'] as String,
-    newHomeserver: localSynapse,
-    newDeviceID: session['device_id'] as String,
-    newDeviceName: name,
-    waitForFirstSync: false,
-    waitUntilLoadCompletedLoaded: false,
-  );
-  return client;
-}
-
-Future<void> _syncUntil(
-  List<TwakeClient> clients,
-  bool Function() condition,
-  String stage,
-) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 45));
-  while (DateTime.now().isBefore(deadline)) {
-    if (condition()) return;
-    for (final client in clients) {
-      await client
-          .oneShotSync(timeout: const Duration(milliseconds: 100))
-          .timeout(const Duration(seconds: 8));
-      if (condition()) return;
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 80));
-  }
-  throw StateError('Real Synapse two-device QR timeout at stage: $stage');
-}
-
-Future<void> _bootstrapRealCrossSigning(TwakeClient client) async {
-  // This is the real SDK bootstrap, generating and uploading signing keys
-  // through the disposable Synapse. No manually trusted device/master keys.
-  final bootstrap = client.encryption!.bootstrap();
-  expect(bootstrap.state, BootstrapState.askNewSsss);
-  final createStorage = bootstrap.newSsss('disposable_qr_test_passphrase');
-  await createStorage.timeout(const Duration(seconds: 50));
-  expect(bootstrap.state, BootstrapState.askSetupCrossSigning);
-  await bootstrap
-      .askSetupCrossSigning(
-        setupMasterKey: true,
-        setupSelfSigningKey: true,
-        setupUserSigningKey: true,
-      )
-      .timeout(const Duration(seconds: 50));
-  expect(
-    bootstrap.state,
-    BootstrapState.askSetupOnlineKeyBackup,
-    reason: 'Real Synapse must accept and return cross-signing keys',
-  );
-  await bootstrap.askSetupOnlineKeyBackup(false);
-  expect(bootstrap.state, BootstrapState.done);
-  expect(client.userDeviceKeys[client.userID]?.masterKey?.verified, true);
-}
 
 Future<void> _runRealQrTest() async {
   if (!vod.isInitialized()) {
@@ -157,22 +26,22 @@ Future<void> _runRealQrTest() async {
   sqfliteFfiInit();
   final temp = await Directory.systemTemp.createTemp('twake-live-qr-');
   addTearDown(() => temp.delete(recursive: true));
-  final registered = await _registerDisposableUser();
+  final registered = await registerDisposableUser();
   final firstPath = path.join(temp.path, 'qr-trusted.sqlite');
   final secondPath = path.join(temp.path, 'qr-untrusted.sqlite');
-  final first = await _openSdkClient(
+  final first = await openSdkClient(
     'qr-trusted',
     registered,
     databasePath: firstPath,
   );
   addTearDown(first.dispose);
   await first.oneShotSync(timeout: const Duration(milliseconds: 100));
-  await _bootstrapRealCrossSigning(first);
+  await bootstrapRealCrossSigning(first);
 
-  final secondSession = await _loginSecondDisposableDevice(
+  final secondSession = await loginSecondDisposableDevice(
     registered['user_id'] as String,
   );
-  final second = await _openSdkClient(
+  final second = await openSdkClient(
     'qr-untrusted',
     secondSession,
     databasePath: secondPath,
@@ -195,7 +64,7 @@ Future<void> _runRealQrTest() async {
     final otherKey = second.userDeviceKeys[userId]!.deviceKeys[first.deviceID]!;
     final scanning = await otherKey.startVerification();
     final txn = scanning.transactionId!;
-    await _syncUntil(
+    await syncUntil(
       [first, second],
       () => first.encryption!.keyVerificationManager.getRequest(txn) != null,
       'encrypted verification request',
@@ -203,7 +72,7 @@ Future<void> _runRealQrTest() async {
     final showing = first.encryption!.keyVerificationManager.getRequest(txn)!;
     expect(showing.state, KeyVerificationState.askAccept);
     await showing.acceptVerification();
-    await _syncUntil(
+    await syncUntil(
       [second, first],
       () => scanning.state == KeyVerificationState.askChoice,
       'ready + qr negotiation',
@@ -231,7 +100,7 @@ Future<void> _runRealQrTest() async {
     false,
     reason: 'Tampered Matrix QR must never verify the master key',
   );
-  await _syncUntil(
+  await syncUntil(
     [first, second],
     () => negativeShower.isDone,
     'negative QR cancellation',
@@ -252,13 +121,13 @@ Future<void> _runRealQrTest() async {
     qrDataRawBytes: authenticQr,
   );
   expect(scanner.state, KeyVerificationState.showQRSuccess);
-  await _syncUntil(
+  await syncUntil(
     [first, second],
     () => shower.state == KeyVerificationState.confirmQRScan,
     'authentic QR reciprocate',
   );
   await shower.acceptQRScanConfirmation();
-  await _syncUntil(
+  await syncUntil(
     [second, first],
     () => scanner.state == KeyVerificationState.done,
     'QR done receipt',
@@ -292,7 +161,7 @@ Future<void> _runRealQrTest() async {
   );
 
   await second.dispose();
-  final restored = await _openSdkClient(
+  final restored = await openSdkClient(
     'qr-untrusted',
     secondSession,
     databasePath: secondPath,
@@ -323,8 +192,8 @@ void main() {
     final temp = await Directory.systemTemp.createTemp('twake-sdk-crypto-');
     addTearDown(() => temp.delete(recursive: true));
     final databasePath = path.join(temp.path, 'device.sqlite');
-    final session = await _registerDisposableUser();
-    final first = await _openSdkClient(
+    final session = await registerDisposableUser();
+    final first = await openSdkClient(
       'matrix-device',
       session,
       databasePath: databasePath,
@@ -335,7 +204,7 @@ void main() {
     expect(originalOlmIdentity, isNotEmpty);
     await first.dispose();
 
-    final reconnected = await _openSdkClient(
+    final reconnected = await openSdkClient(
       'matrix-device',
       session,
       databasePath: databasePath,
@@ -361,7 +230,7 @@ void main() {
     );
     expect(unauthorized.statusCode, 401);
     await expectLater(() async {
-      final denied = await _openSdkClient(
+      final denied = await openSdkClient(
         'matrix-invalid-token',
         session,
         databasePath: path.join(temp.path, 'invalid.sqlite'),
@@ -382,9 +251,9 @@ void main() {
         'twake-revoked-token-',
       );
       addTearDown(() => temp.delete(recursive: true));
-      final session = await _registerDisposableUser();
+      final session = await registerDisposableUser();
       final token = session['access_token'] as String;
-      final client = await _openSdkClient(
+      final client = await openSdkClient(
         'revoked-device',
         session,
         databasePath: path.join(temp.path, 'revoked.sqlite'),
@@ -441,20 +310,20 @@ void main() {
         'twake-ssss-new-device-',
       );
       addTearDown(() => temp.delete(recursive: true));
-      final session = await _registerDisposableUser();
-      final origin = await _openSdkClient(
+      final session = await registerDisposableUser();
+      final origin = await openSdkClient(
         'ssss-original',
         session,
         databasePath: path.join(temp.path, 'original.sqlite'),
       );
       addTearDown(origin.dispose);
       await origin.oneShotSync(timeout: const Duration(milliseconds: 100));
-      await _bootstrapRealCrossSigning(origin);
+      await bootstrapRealCrossSigning(origin);
 
-      final secondSession = await _loginSecondDisposableDevice(
+      final secondSession = await loginSecondDisposableDevice(
         session['user_id'] as String,
       );
-      final fresh = await _openSdkClient(
+      final fresh = await openSdkClient(
         'ssss-fresh',
         secondSession,
         databasePath: path.join(temp.path, 'fresh.sqlite'),
