@@ -392,7 +392,7 @@ void main() {
         reason: 'A revoked device must not be able to use its session',
       );
       await syncUntil(
-        [second, third],
+        [second, restarted],
         () => second.userDeviceKeys[userId]?.deviceKeys[first.deviceID] == null,
         'the revoked device is removed from the device list',
       );
@@ -403,9 +403,9 @@ void main() {
       // the revocation.
       await verifyDevicesByQr(shower: second, scanner: restarted);
       await second.updateUserDeviceKeys();
-      await third.updateUserDeviceKeys();
+      await restarted.updateUserDeviceKeys();
       expect(
-        third.userDeviceKeys[userId]?.deviceKeys[second.deviceID]?.verified,
+        restarted.userDeviceKeys[userId]?.deviceKeys[second.deviceID]?.verified,
         isTrue,
         reason: 'The new QR verification must establish the trust explicitly',
       );
