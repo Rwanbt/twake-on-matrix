@@ -27,10 +27,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: "stable"
@@ -38,10 +38,10 @@ jobs:
           cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:-${{ hashFiles('**/pubspec.lock') }}"
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
 
       - name: Cache Cargo
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ~/.cargo/registry
@@ -51,7 +51,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-debug-
 
-      - uses: webfactory/ssh-agent@v0.9.0
+      - uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
 
@@ -82,7 +82,7 @@ jobs:
           echo "URL=https://$GITHUB_REPOSITORY_OWNER.github.io/${GITHUB_REPOSITORY##*/}/$FOLDER" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: build/web
@@ -90,7 +90,7 @@ jobs:
           destination_dir: "${{ github.event.pull_request.number }}"
 
       - name: Find deployment comment
-        uses: peter-evans/find-comment@v3
+        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e
         id: fc
         with:
           comment-author: "github-actions[bot]"
@@ -98,7 +98,7 @@ jobs:
           body-includes: "This PR has been deployed to"
 
       - name: Create or update deployment comment
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}

@@ -47,7 +47,7 @@ jobs:
     outputs:
       targets: ${{ steps.list.outputs.targets }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
 
@@ -121,12 +121,12 @@ jobs:
       GIT_TERMINAL_PROMPT: "0"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -199,7 +199,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: playwright-report-${{ strategy.job-index }}
           path: playwright-report/
@@ -207,7 +207,7 @@ jobs:
 
       - name: Upload failure traces
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: test-results-${{ strategy.job-index }}
           path: test-results/
@@ -240,12 +240,12 @@ jobs:
       GIT_TERMINAL_PROMPT: "0"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -336,7 +336,7 @@ jobs:
           PY
 
       - name: Upload Web performance results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: perf-web-${{ github.run_id }}
           path: |
@@ -384,18 +384,18 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
 
       - name: Download Web performance results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: perf-web-${{ github.run_id }}
           path: perf-results/
 
       - name: Checkout existing GitHub Pages
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: gh-pages
           path: existing-pages
@@ -427,7 +427,7 @@ jobs:
             --runner-image "${ImageOS:-ubuntu}-${ImageVersion:-unknown}"
 
       - name: Publish dashboard
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
