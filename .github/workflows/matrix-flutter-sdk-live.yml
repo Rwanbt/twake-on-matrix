@@ -60,6 +60,10 @@ jobs:
         run: |
           set -euo pipefail
           flutter test test/integration_test/matrix_sdk_backup_restore_test.dart --dart-define=TWAKE_LIVE_SYNAPSE=true
+      - name: Verify the hostile encrypted event scenarios fail closed
+        run: |
+          set -euo pipefail
+          flutter test test/integration_test/matrix_sdk_hostile_scenarios_test.dart --dart-define=TWAKE_LIVE_SYNAPSE=true
       - name: Destroy disposable homeserver
         if: always()
         run: docker rm -f synapse || true
