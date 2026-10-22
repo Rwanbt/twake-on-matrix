@@ -16,7 +16,7 @@ jobs:
   sdk-session-and-storage:
     name: SDK session and mocked platform secure storage
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -56,6 +56,14 @@ jobs:
             echo "::error::Matrix QR shared secret appeared unredacted in SDK logs"
             exit 1
           fi
+      - name: Verify real Synapse E2EE backup and restore of the room keys
+        run: |
+          set -euo pipefail
+          flutter test test/integration_test/matrix_sdk_backup_restore_test.dart --dart-define=TWAKE_LIVE_SYNAPSE=true
+      - name: Verify the hostile encrypted event scenarios fail closed
+        run: |
+          set -euo pipefail
+          flutter test test/integration_test/matrix_sdk_hostile_scenarios_test.dart --dart-define=TWAKE_LIVE_SYNAPSE=true
       - name: Destroy disposable homeserver
         if: always()
         run: docker rm -f synapse || true
