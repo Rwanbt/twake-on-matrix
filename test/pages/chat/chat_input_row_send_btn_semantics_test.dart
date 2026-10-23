@@ -39,7 +39,6 @@ void main() {
     );
 
     expect(find.byTooltip('Voice message'), findsOneWidget);
-    final recordFinder = find.byTooltip('Voice message');
     final recordNode = tester.getSemantics(
       find.bySemanticsLabel('Voice message'),
     );
