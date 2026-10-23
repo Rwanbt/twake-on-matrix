@@ -38,12 +38,17 @@ void main() {
       ),
     );
 
-    expect(find.byTooltip('Voice message'), findsOneWidget);
-    final recordNode = tester.getSemantics(find.byTooltip('Voice message'));
+    final recordTooltip = find.byTooltip('Voice message');
+    expect(recordTooltip, findsOneWidget);
+    final recordTarget = find.ancestor(
+      of: recordTooltip,
+      matching: find.byType(InkWell),
+    ).first;
+    final recordNode = tester.getSemantics(recordTooltip);
     final recordData = recordNode.getSemanticsData();
     expect(recordData.tooltip, 'Voice message');
     expect(recordData.hasAction(SemanticsAction.tap), isTrue);
-    expect(tester.getSize(find.byTooltip('Voice message')), const Size(44, 44));
+    expect(tester.getSize(recordTarget), const Size(44, 44));
 
     recordingState.value = AudioRecordState.recording;
     await tester.pump();
@@ -58,7 +63,11 @@ void main() {
       expect(data.hasAction(SemanticsAction.tap), isTrue);
     }
     for (final label in ['Delete', 'Send audio']) {
-      final size = tester.getSize(find.byTooltip(label));
+      final target = find.ancestor(
+        of: find.byTooltip(label),
+        matching: find.byType(InkWell),
+      ).first;
+      final size = tester.getSize(target);
       expect(size.width, greaterThanOrEqualTo(44));
       expect(size.height, greaterThanOrEqualTo(44));
     }

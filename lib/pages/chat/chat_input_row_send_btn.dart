@@ -42,39 +42,48 @@ class ChatInputRowSendBtn extends StatelessWidget {
                   if (audioState == AudioRecordState.recording) ...[
                     Padding(
                       padding: ChatInputRowStyle.sendIconPadding,
-                      child: TwakeIconButton(
-                        hoverColor: Colors.transparent,
-                        splashColor: Colors.transparent,
-                        size: ChatInputRowStyle.sendIconBtnSize,
-                        imagePath: Assets.images.icDeleteRecorderWeb.path,
-                        tooltip: L10n.of(context)!.delete,
-                        onTap: () => onDeleteRecorderWeb?.call(),
-                        paddingAll: 0,
+                      child: SizedBox.square(
+                        dimension: ChatInputRowStyle.sendIconBtnSize,
+                        child: TwakeIconButton(
+                          hoverColor: Colors.transparent,
+                          splashColor: Colors.transparent,
+                          size: ChatInputRowStyle.sendIconBtnSize,
+                          imagePath: Assets.images.icDeleteRecorderWeb.path,
+                          tooltip: L10n.of(context)!.delete,
+                          onTap: () => onDeleteRecorderWeb?.call(),
+                          paddingAll: 0,
+                        ),
                       ),
                     ),
                     Padding(
                       padding: ChatInputRowStyle.sendIconPadding,
-                      child: TwakeIconButton(
-                        hoverColor: Colors.transparent,
-                        splashColor: Colors.transparent,
-                        size: ChatInputRowStyle.sendIconBtnSize,
-                        imagePath: Assets.images.icSend.path,
-                        tooltip: L10n.of(context)!.sendAudio,
-                        onTap: () => onFinishRecorderWeb?.call(),
-                        paddingAll: 0,
+                      child: SizedBox.square(
+                        dimension: ChatInputRowStyle.sendIconBtnSize,
+                        child: TwakeIconButton(
+                          hoverColor: Colors.transparent,
+                          splashColor: Colors.transparent,
+                          size: ChatInputRowStyle.sendIconBtnSize,
+                          imagePath: Assets.images.icSend.path,
+                          tooltip: L10n.of(context)!.sendAudio,
+                          onTap: () => onFinishRecorderWeb?.call(),
+                          paddingAll: 0,
+                        ),
                       ),
                     ),
                   ] else
                     Padding(
                       padding: ChatInputRowStyle.sendIconPadding,
-                      child: TwakeIconButton(
-                        hoverColor: Colors.transparent,
-                        splashColor: Colors.transparent,
-                        size: ChatInputRowStyle.sendIconBtnSize,
-                        imagePath: Assets.images.icRecorder.path,
-                        tooltip: L10n.of(context)!.voiceMessage,
-                        onTap: () => onTapRecorderWeb?.call(),
-                        paddingAll: 0,
+                      child: SizedBox.square(
+                        dimension: ChatInputRowStyle.sendIconBtnSize,
+                        child: TwakeIconButton(
+                          hoverColor: Colors.transparent,
+                          splashColor: Colors.transparent,
+                          size: ChatInputRowStyle.sendIconBtnSize,
+                          imagePath: Assets.images.icRecorder.path,
+                          tooltip: L10n.of(context)!.voiceMessage,
+                          onTap: () => onTapRecorderWeb?.call(),
+                          paddingAll: 0,
+                        ),
                       ),
                     ),
                 ],
