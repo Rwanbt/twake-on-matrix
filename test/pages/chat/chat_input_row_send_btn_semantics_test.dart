@@ -40,7 +40,8 @@ void main() {
 
     expect(find.byTooltip('Voice message'), findsOneWidget);
     final recordFinder = find.byTooltip('Voice message');
-    final recordNode = tester.getSemantics(find.bySemanticsLabel('Voice message'));
+    final recordNode =
+        tester.getSemantics(find.bySemanticsLabel('Voice message'));
     final recordData = recordNode.getSemanticsData();
     expect(recordData.label, 'Voice message');
     expect(recordData.actions & (1 << SemanticsAction.tap.index), isNot(0));
