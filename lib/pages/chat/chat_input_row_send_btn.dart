@@ -42,60 +42,39 @@ class ChatInputRowSendBtn extends StatelessWidget {
                   if (audioState == AudioRecordState.recording) ...[
                     Padding(
                       padding: ChatInputRowStyle.sendIconPadding,
-                      child: Semantics(
-                        button: true,
-                        label: L10n.of(context)!.delete,
+                      child: TwakeIconButton(
+                        hoverColor: Colors.transparent,
+                        splashColor: Colors.transparent,
+                        size: ChatInputRowStyle.sendIconBtnSize,
+                        imagePath: Assets.images.icDeleteRecorderWeb.path,
+                        tooltip: L10n.of(context)!.delete,
                         onTap: () => onDeleteRecorderWeb?.call(),
-                        child: ExcludeSemantics(
-                          child: TwakeIconButton(
-                            hoverColor: Colors.transparent,
-                            splashColor: Colors.transparent,
-                            size: ChatInputRowStyle.sendIconBtnSize,
-                            imagePath: Assets.images.icDeleteRecorderWeb.path,
-                            tooltip: L10n.of(context)!.delete,
-                            onTap: () => onDeleteRecorderWeb?.call(),
-                            paddingAll: 0,
-                          ),
-                        ),
+                        paddingAll: 0,
                       ),
                     ),
                     Padding(
                       padding: ChatInputRowStyle.sendIconPadding,
-                      child: Semantics(
-                        button: true,
-                        label: L10n.of(context)!.sendAudio,
+                      child: TwakeIconButton(
+                        hoverColor: Colors.transparent,
+                        splashColor: Colors.transparent,
+                        size: ChatInputRowStyle.sendIconBtnSize,
+                        imagePath: Assets.images.icSend.path,
+                        tooltip: L10n.of(context)!.sendAudio,
                         onTap: () => onFinishRecorderWeb?.call(),
-                        child: ExcludeSemantics(
-                          child: TwakeIconButton(
-                            hoverColor: Colors.transparent,
-                            splashColor: Colors.transparent,
-                            size: ChatInputRowStyle.sendIconBtnSize,
-                            imagePath: Assets.images.icSend.path,
-                            tooltip: L10n.of(context)!.sendAudio,
-                            onTap: () => onFinishRecorderWeb?.call(),
-                            paddingAll: 0,
-                          ),
-                        ),
+                        paddingAll: 0,
                       ),
                     ),
                   ] else
                     Padding(
                       padding: ChatInputRowStyle.sendIconPadding,
-                      child: Semantics(
-                        button: true,
-                        label: L10n.of(context)!.voiceMessage,
+                      child: TwakeIconButton(
+                        hoverColor: Colors.transparent,
+                        splashColor: Colors.transparent,
+                        size: ChatInputRowStyle.sendIconBtnSize,
+                        imagePath: Assets.images.icRecorder.path,
+                        tooltip: L10n.of(context)!.voiceMessage,
                         onTap: () => onTapRecorderWeb?.call(),
-                        child: ExcludeSemantics(
-                          child: TwakeIconButton(
-                            hoverColor: Colors.transparent,
-                            splashColor: Colors.transparent,
-                            size: ChatInputRowStyle.sendIconBtnSize,
-                            imagePath: Assets.images.icRecorder.path,
-                            tooltip: L10n.of(context)!.voiceMessage,
-                            onTap: () => onTapRecorderWeb?.call(),
-                            paddingAll: 0,
-                          ),
-                        ),
+                        paddingAll: 0,
                       ),
                     ),
                 ],
