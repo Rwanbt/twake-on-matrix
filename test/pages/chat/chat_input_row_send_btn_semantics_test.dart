@@ -70,9 +70,6 @@ void main() {
 }
 
 Finder _inkWellTarget(Finder tooltip) {
-  final ancestor = find.ancestor(
-    of: tooltip,
-    matching: find.byType(InkWell),
-  );
+  final ancestor = find.ancestor(of: tooltip, matching: find.byType(InkWell));
   return ancestor.first;
 }
