@@ -40,10 +40,7 @@ void main() {
 
     final recordTooltip = find.byTooltip('Voice message');
     expect(recordTooltip, findsOneWidget);
-    final recordTarget = find.ancestor(
-      of: recordTooltip,
-      matching: find.byType(InkWell),
-    ).first;
+    final recordTarget = _inkWellTarget(recordTooltip);
     final recordNode = tester.getSemantics(recordTooltip);
     final recordData = recordNode.getSemanticsData();
     expect(recordData.tooltip, 'Voice message');
@@ -63,14 +60,19 @@ void main() {
       expect(data.hasAction(SemanticsAction.tap), isTrue);
     }
     for (final label in ['Delete', 'Send audio']) {
-      final target = find.ancestor(
-        of: find.byTooltip(label),
-        matching: find.byType(InkWell),
-      ).first;
+      final target = _inkWellTarget(find.byTooltip(label));
       final size = tester.getSize(target);
       expect(size.width, greaterThanOrEqualTo(44));
       expect(size.height, greaterThanOrEqualTo(44));
     }
     expect(tester.takeException(), isNull);
   });
+}
+
+Finder _inkWellTarget(Finder tooltip) {
+  final ancestor = find.ancestor(
+    of: tooltip,
+    matching: find.byType(InkWell),
+  );
+  return ancestor.first;
 }
