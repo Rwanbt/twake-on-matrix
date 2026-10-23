@@ -7,15 +7,11 @@ import 'package:twake_chat/presentation/mixins/audio_mixin.dart';
 import 'package:twake_chat/utils/platform_infos.dart';
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-
   testWidgets('web voice recording controls expose actionable semantics', (
     tester,
   ) async {
     PlatformInfos.isTestingForWeb = true;
     addTearDown(() => PlatformInfos.isTestingForWeb = false);
-    final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
     final inputText = ValueNotifier('');
     final recordingState = ValueNotifier(AudioRecordState.initial);
     addTearDown(inputText.dispose);
